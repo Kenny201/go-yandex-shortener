@@ -40,7 +40,8 @@ func handleGetShort(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 
-	http.Redirect(w, r, urlStorage[id], http.StatusTemporaryRedirect)
+	w.Header().Set("Location", urlStorage[id])
+	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
 func handlePostShort(w http.ResponseWriter, r *http.Request) {
