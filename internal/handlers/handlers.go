@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/storage"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/urlgenerator"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -45,16 +46,21 @@ func handleGetShort(w http.ResponseWriter, id string) {
 }
 
 func handlePostShort(w http.ResponseWriter, r *http.Request) {
-	inputURL := r.FormValue("url")
+	body, err := io.ReadAll(r.Body)
 
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, string(err.Error()), http.StatusBadRequest)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	body := urlgenerator.GetShortURL(inputURL, r)
+	if len(body) == 0 {
+		http.Error(w, "request body is empty", http.StatusBadRequest)
+		return
+	}
+
+	response := urlgenerator.GetShortURL(string(body), r)
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(body))
+	w.Write([]byte(response))
 }
