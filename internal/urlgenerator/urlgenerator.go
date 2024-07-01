@@ -12,7 +12,7 @@ const (
 	letterBytes    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 )
 
-func GenerateShortKey() string {
+func generateShortKey() string {
 	b := make([]byte, lengthShortURL)
 
 	for i := range b {
@@ -31,12 +31,12 @@ func GetShortURL(inputURL string, r *http.Request) string {
 		if key, ok := storage.CheckExistsValueIntoURLStorage(inputURL); ok {
 			body = fmt.Sprintf("http://%v/%s", r.Host, key)
 		} else {
-			shortURL := GenerateShortKey()
+			shortURL := generateShortKey()
 			urlStorage[shortURL] = inputURL
 			body = fmt.Sprintf("http://%v/%s", r.Host, shortURL)
 		}
 	} else {
-		shortURL := GenerateShortKey()
+		shortURL := generateShortKey()
 		urlStorage[shortURL] = inputURL
 		body = fmt.Sprintf("http://%v/%s", r.Host, shortURL)
 	}
