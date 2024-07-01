@@ -51,11 +51,6 @@ func handlePostShort(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if inputURL == "" {
-		http.Error(w, "Field url required", http.StatusBadRequest)
-		return
-	}
-
 	body := urlgenerator.GetShortURL(inputURL, r)
 
 	w.Header().Set("Content-Type", "text/plain")
