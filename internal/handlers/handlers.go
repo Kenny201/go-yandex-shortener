@@ -25,7 +25,7 @@ func ShortHandler(w http.ResponseWriter, r *http.Request) {
 	case id:
 		switch r.Method {
 		case "GET":
-			handleGetShort(w, r, firstSegmentURL)
+			handleGetShort(w, firstSegmentURL)
 		default:
 			http.Error(w, "Method not allowed", http.StatusBadRequest)
 		}
@@ -34,7 +34,7 @@ func ShortHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleGetShort(w http.ResponseWriter, r *http.Request, id string) {
+func handleGetShort(w http.ResponseWriter, id string) {
 	if _, ok := urlStorage[id]; !ok {
 		w.WriteHeader(http.StatusBadRequest)
 		return
