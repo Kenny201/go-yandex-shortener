@@ -10,7 +10,7 @@ func GetStorage() *map[string]string {
 	return &urlStorage
 }
 
-func CheckExistsValueIntoUrlStorage(shortValue string) (string, bool) {
+func CheckExistsValueIntoURLStorage(shortValue string) (string, bool) {
 	for key, value := range urlStorage {
 		if value == shortValue {
 			return key, true

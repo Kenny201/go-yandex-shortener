@@ -8,12 +8,12 @@ import (
 )
 
 const (
-	lengthShortUrl = 5
+	lengthShortURL = 5
 	letterBytes    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 )
 
 func GenerateShortKey() string {
-	b := make([]byte, lengthShortUrl)
+	b := make([]byte, lengthShortURL)
 
 	for i := range b {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
@@ -22,23 +22,23 @@ func GenerateShortKey() string {
 	return string(b)
 }
 
-func GetShortUrl(inputUrl string, r *http.Request) string {
+func GetShortURL(inputURL string, r *http.Request) string {
 	var body string
 
 	urlStorage := *storage.GetStorage()
 
 	if len(urlStorage) != 0 {
-		if key, ok := storage.CheckExistsValueIntoUrlStorage(inputUrl); ok {
+		if key, ok := storage.CheckExistsValueIntoURLStorage(inputURL); ok {
 			body = fmt.Sprintf("http://%v/%s", r.Host, key)
 		} else {
-			shortUrl := GenerateShortKey()
-			urlStorage[shortUrl] = inputUrl
-			body = fmt.Sprintf("http://%v/%s", r.Host, shortUrl)
+			shortURL := GenerateShortKey()
+			urlStorage[shortURL] = inputURL
+			body = fmt.Sprintf("http://%v/%s", r.Host, shortURL)
 		}
 	} else {
-		shortUrl := GenerateShortKey()
-		urlStorage[shortUrl] = inputUrl
-		body = fmt.Sprintf("http://%v/%s", r.Host, shortUrl)
+		shortURL := GenerateShortKey()
+		urlStorage[shortURL] = inputURL
+		body = fmt.Sprintf("http://%v/%s", r.Host, shortURL)
 	}
 
 	return body

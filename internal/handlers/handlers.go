@@ -11,8 +11,8 @@ import (
 var urlStorage = *storage.GetStorage()
 
 func ShortHandler(w http.ResponseWriter, r *http.Request) {
-	firstSegmentUrl := strings.Split(r.URL.Path[1:], "/")[0]
-	id := fmt.Sprintf("/%s", firstSegmentUrl)
+	firstSegmentURL := strings.Split(r.URL.Path[1:], "/")[0]
+	id := fmt.Sprintf("/%s", firstSegmentURL)
 
 	switch r.URL.Path {
 	case "/":
@@ -25,7 +25,7 @@ func ShortHandler(w http.ResponseWriter, r *http.Request) {
 	case id:
 		switch r.Method {
 		case "GET":
-			handleGetShort(w, r, firstSegmentUrl)
+			handleGetShort(w, r, firstSegmentURL)
 		default:
 			http.Error(w, "Method not allowed", http.StatusBadRequest)
 		}
@@ -44,19 +44,19 @@ func handleGetShort(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 func handlePostShort(w http.ResponseWriter, r *http.Request) {
-	inputUrl := r.FormValue("url")
+	inputURL := r.FormValue("url")
 
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, string([]byte(err.Error())), http.StatusBadRequest)
+		http.Error(w, string(err.Error()), http.StatusBadRequest)
 		return
 	}
 
-	if inputUrl == "" {
+	if inputURL == "" {
 		http.Error(w, "Field url required", http.StatusBadRequest)
 		return
 	}
 
-	body := urlgenerator.GetShortUrl(inputUrl, r)
+	body := urlgenerator.GetShortURL(inputURL, r)
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
