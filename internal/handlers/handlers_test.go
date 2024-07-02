@@ -22,6 +22,7 @@ func TestPostHandler(t *testing.T) {
 	postHandler(w, req)
 
 	res := w.Result()
+	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusCreated {
 		t.Errorf("excpected statud OK; got %v", res.StatusCode)
@@ -70,5 +71,7 @@ func TestGetByIDHandler(t *testing.T) {
 			t.Errorf("location header does not match: got %v want %v",
 				location, "https://practicum.yandex.ru")
 		}
+
+		res.Body.Close()
 	}
 }
