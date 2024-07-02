@@ -30,7 +30,7 @@ func TestPostHandler(t *testing.T) {
 
 	if ctype := w.Header().Get("Content-Type"); ctype != "text/plain" {
 		t.Errorf("content type header does not match: got %v want %v",
-			ctype, "text-plain")
+			ctype, "text/plain")
 	}
 
 	_, err = io.ReadAll(res.Body)
