@@ -11,7 +11,7 @@ import (
 
 var urlStorage = *storage.GetStorage()
 
-func ShortHandler(w http.ResponseWriter, r *http.Request) {
+func Handler(w http.ResponseWriter, r *http.Request) {
 	firstSegmentURL := strings.Split(r.URL.Path[1:], "/")[0]
 	id := fmt.Sprintf("/%s", firstSegmentURL)
 
@@ -19,14 +19,14 @@ func ShortHandler(w http.ResponseWriter, r *http.Request) {
 	case "/":
 		switch r.Method {
 		case "POST":
-			handlePostShort(w, r)
+			postHandler(w, r)
 		default:
 			http.Error(w, "Method not allowed", http.StatusBadRequest)
 		}
 	case id:
 		switch r.Method {
 		case "GET":
-			handleGetShort(w, firstSegmentURL)
+			getByIDHandler(w, firstSegmentURL)
 		default:
 			http.Error(w, "Method not allowed", http.StatusBadRequest)
 		}
@@ -35,7 +35,7 @@ func ShortHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleGetShort(w http.ResponseWriter, id string) {
+func getByIDHandler(w http.ResponseWriter, id string) {
 	if _, ok := urlStorage[id]; !ok {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -45,7 +45,7 @@ func handleGetShort(w http.ResponseWriter, id string) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func handlePostShort(w http.ResponseWriter, r *http.Request) {
+func postHandler(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 
 	if err != nil {

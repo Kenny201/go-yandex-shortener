@@ -18,8 +18,8 @@ func NewServer(listenPort string) *Server {
 func (s *Server) Start() error {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", handlers.ShortHandler)
-	mux.HandleFunc("/{id}", handlers.ShortHandler)
+	mux.HandleFunc("/", handlers.Handler)
+	mux.HandleFunc("/{id}", handlers.Handler)
 
 	return http.ListenAndServe(s.listenPort, mux)
 }
