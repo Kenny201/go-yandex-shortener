@@ -15,7 +15,7 @@ func NewMemoryRepositories() *RepositoryMemory {
 	}
 }
 
-func (r *RepositoryMemory) GetURL(id string) (*entity.URL, error) {
+func (r *RepositoryMemory) Get(id string) (*entity.URL, error) {
 	if _, ok := r.urls[id]; !ok {
 		err := errors.New("short url not found")
 		return nil, err
@@ -24,7 +24,7 @@ func (r *RepositoryMemory) GetURL(id string) (*entity.URL, error) {
 	return r.urls[id], nil
 }
 
-func (r *RepositoryMemory) GetAllURL() []entity.URL {
+func (r *RepositoryMemory) GetAll() []entity.URL {
 	var urls []entity.URL
 
 	for _, url := range r.urls {
@@ -34,13 +34,13 @@ func (r *RepositoryMemory) GetAllURL() []entity.URL {
 	return urls
 }
 
-func (r *RepositoryMemory) PutURL(url *entity.URL) (*entity.URL, error) {
+func (r *RepositoryMemory) Put(url *entity.URL) (*entity.URL, error) {
 	r.urls[url.ID()] = url
 
 	return url, nil
 }
 
-func (r *RepositoryMemory) CheckExistsOriginalURL(shortValue string) (*entity.URL, bool) {
+func (r *RepositoryMemory) CheckExistsOriginal(shortValue string) (*entity.URL, bool) {
 	for _, value := range r.urls {
 		if value.OriginalURL() == shortValue {
 			return value, true

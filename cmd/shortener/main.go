@@ -8,13 +8,15 @@ import (
 )
 
 func main() {
-	us, err := url.NewUrlService(url.WithMemoryUrlRepository())
+	us, err := url.NewService(url.WithMemoryRepository())
 
 	if err != nil {
 		fmt.Printf("%v", err)
+
+		return
 	}
 
-	urlHandler := http.NewUrlHandler(us)
+	urlHandler := http.NewURLHandler(us)
 
 	server := http.NewServer(":8080", urlHandler)
 	log.Fatal(server.Start())

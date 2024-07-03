@@ -1,21 +1,20 @@
 package url
 
 import (
-	"fmt"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/url"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/url/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra"
 	"net/http"
 )
 
-type UrlConfiguration func(us *UrlService) error
+type Configuration func(us *Service) error
 
-type UrlService struct {
-	ur url.UrlRepository
+type Service struct {
+	Ur url.Repository
 }
 
-func NewUrlService(cfgs ...UrlConfiguration) (*UrlService, error) {
-	us := &UrlService{}
+func NewService(cfgs ...Configuration) (*Service, error) {
+	us := &Service{}
 
 	for _, cfg := range cfgs {
 		err := cfg(us)
@@ -27,46 +26,40 @@ func NewUrlService(cfgs ...UrlConfiguration) (*UrlService, error) {
 	return us, nil
 }
 
-func WithUrlRepository(ur url.UrlRepository) UrlConfiguration {
-	return func(us *UrlService) error {
-		us.ur = ur
+func WithRepository(ur url.Repository) Configuration {
+	return func(us *Service) error {
+		us.Ur = ur
 		return nil
 	}
 }
 
-func WithMemoryUrlRepository() UrlConfiguration {
+func WithMemoryRepository() Configuration {
 	mr := infra.NewMemoryRepositories()
-	return WithUrlRepository(mr)
+	return WithRepository(mr)
 }
 
-func (us *UrlService) PutURL(url string, r *http.Request) (string, error) {
+func (us *Service) Put(url string, r *http.Request) (string, error) {
 	var body string
 
-	if len(us.ur.GetAllURL()) != 0 {
-		if key, ok := us.ur.CheckExistsOriginalURL(url); ok {
+	if len(us.Ur.GetAll()) != 0 {
+		if key, ok := us.Ur.CheckExistsOriginal(url); ok {
 			body = key.FullShortURL()
-
-			fmt.Print(us.ur.GetAllURL())
 		} else {
-			urlEntity := entity.NewUrl(url, r.Host)
-			urlEntity, _ = us.ur.PutURL(urlEntity)
+			urlEntity := entity.NewURL(url, r.Host)
+			urlEntity, _ = us.Ur.Put(urlEntity)
 			body = urlEntity.FullShortURL()
-
-			fmt.Print(us.ur.GetAllURL())
 		}
 	} else {
-		urlEntity := entity.NewUrl(url, r.Host)
-		urlEntity, _ = us.ur.PutURL(urlEntity)
+		urlEntity := entity.NewURL(url, r.Host)
+		urlEntity, _ = us.Ur.Put(urlEntity)
 		body = urlEntity.FullShortURL()
-
-		fmt.Print(us.ur.GetAllURL())
 	}
 
 	return body, nil
 }
 
-func (us *UrlService) GetURL(url string) (*entity.URL, error) {
-	result, err := us.ur.GetURL(url)
+func (us *Service) Get(url string) (*entity.URL, error) {
+	result, err := us.Ur.Get(url)
 
 	if err != nil {
 		return nil, err

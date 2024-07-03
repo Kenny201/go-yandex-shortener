@@ -6,25 +6,24 @@ import (
 	"net/http"
 )
 
-type UrlService interface {
-	PutURL(url string, r *http.Request) (string, error)
-	GetURL(url string) (*entity.URL, error)
+type URLService interface {
+	Put(url string, r *http.Request) (string, error)
+	Get(url string) (*entity.URL, error)
 }
 
-type UrlHandler struct {
-	urlService UrlService
+type URLHandler struct {
+	urlService URLService
 }
 
-func NewUrlHandler(us UrlService) UrlHandler {
-	return UrlHandler{
+func NewURLHandler(us URLService) URLHandler {
+	return URLHandler{
 		urlService: us,
 	}
 }
 
-func (uh UrlHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
+func (uh URLHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-
-	url, err := uh.urlService.GetURL(id)
+	url, err := uh.urlService.Get(id)
 
 	if err != nil {
 		http.Error(w, "resource not found", http.StatusBadRequest)
@@ -36,7 +35,7 @@ func (uh UrlHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (uh UrlHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
+func (uh URLHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 
 	if err != nil {
@@ -49,7 +48,7 @@ func (uh UrlHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, _ := uh.urlService.PutURL(string(body), r)
+	shortURL, _ := uh.urlService.Put(string(body), r)
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)

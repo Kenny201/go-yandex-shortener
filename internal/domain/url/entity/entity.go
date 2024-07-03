@@ -10,23 +10,13 @@ const (
 	letterBytes    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 )
 
-func generateShortKey() string {
-	b := make([]byte, lengthShortURL)
-
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-
-	return string(b)
-}
-
 type URL struct {
 	id           string
 	originalURL  string
 	fullShortURL string
 }
 
-func NewUrl(originalURL string, host string) *URL {
+func NewURL(originalURL string, host string) *URL {
 	shortURL := generateShortKey()
 
 	return &URL{
@@ -46,4 +36,14 @@ func (u URL) OriginalURL() string {
 
 func (u URL) FullShortURL() string {
 	return u.fullShortURL
+}
+
+func generateShortKey() string {
+	b := make([]byte, lengthShortURL)
+
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+
+	return string(b)
 }

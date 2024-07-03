@@ -3,11 +3,11 @@ package http
 import "net/http"
 
 type Server struct {
-	urlHandler UrlHandler
+	urlHandler URLHandler
 	listenPort string
 }
 
-func NewServer(listenPort string, handler UrlHandler) *Server {
+func NewServer(listenPort string, handler URLHandler) *Server {
 	return &Server{
 		urlHandler: handler,
 		listenPort: listenPort,
