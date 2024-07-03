@@ -13,7 +13,7 @@ func GetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	if _, ok := urlStorage[id]; !ok {
-		w.WriteHeader(http.StatusBadRequest)
+		http.Error(w, "resource not found", http.StatusBadRequest)
 		return
 	}
 
