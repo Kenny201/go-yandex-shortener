@@ -1,7 +1,8 @@
-package handlers
+package http
 
 import (
-	"github.com/Kenny201/go-yandex-shortener.git/internal/storage"
+	"fmt"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/url"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -18,7 +19,15 @@ func TestPostHandler(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	PostHandler(w, req)
+	us, err := url.NewService(url.WithMemoryRepository())
+
+	if err != nil {
+		fmt.Printf("%v", err)
+
+		return
+	}
+
+	NewURLHandler(us).PostHandler(w, req)
 
 	res := w.Result()
 	defer res.Body.Close()
@@ -41,25 +50,27 @@ func TestPostHandler(t *testing.T) {
 
 func TestGetByIDHandler(t *testing.T) {
 	req, err := http.NewRequest(http.MethodPost, "http://localhost:8080", strings.NewReader("https://practicum.yandex.ru"))
-
 	if err != nil {
 		t.Fatalf("method not alowed: %v", err)
 	}
 
 	responseForPost := httptest.NewRecorder()
-	PostHandler(responseForPost, req)
-	urlStorage := *storage.GetStorage()
+	us, _ := url.NewService(url.WithMemoryRepository())
+	handler := NewURLHandler(us)
+	handler.PostHandler(responseForPost, req)
 
-	for k := range urlStorage {
+	urlStorage := us.Ur.GetAll()
+
+	for _, v := range urlStorage {
 		req, err := http.NewRequest(http.MethodGet, "http://localhost:8080/", nil)
-		req.SetPathValue("id", k)
+		req.SetPathValue("id", v.ID())
 
 		if err != nil {
 			t.Fatalf("method not alowed: %v", err)
 		}
 
 		responseForGet := httptest.NewRecorder()
-		GetByIDHandler(responseForGet, req)
+		handler.GetByIDHandler(responseForGet, req)
 		res := responseForGet.Result()
 
 		if res.StatusCode != http.StatusTemporaryRedirect {
