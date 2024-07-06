@@ -7,6 +7,6 @@ import (
 type Repository interface {
 	Get(id string) (*entity.URL, error)
 	GetAll() []entity.URL
-	Put(url *entity.URL) (*entity.URL, error)
+	Put(url *entity.URL) *entity.URL
 	CheckExistsOriginal(shortValue string) (*entity.URL, bool)
 }
