@@ -1,9 +1,7 @@
 package config
 
 import (
-	"errors"
 	"strconv"
-	"strings"
 )
 
 type netAddressExit struct {
@@ -17,16 +15,7 @@ func (a *netAddressExit) String() string {
 }
 
 func (a *netAddressExit) Set(s string) error {
-	url := strings.Split(s, "://")
-	protocol, host := getProtocolAndHost(url)
-
-	hp := strings.Split(host, ":")
-
-	if len(hp) != 2 {
-		return errors.New("need address in b form host:port")
-	}
-
-	port, err := strconv.Atoi(hp[1])
+	protocol, hp, err := ParseBaseURL(s)
 
 	if err != nil {
 		return err
@@ -34,22 +23,11 @@ func (a *netAddressExit) Set(s string) error {
 
 	a.Scheme = protocol
 	a.Host = hp[0]
-	a.Port = port
+	a.Port, err = strconv.Atoi(hp[1])
 
-	return nil
-}
-
-func getProtocolAndHost(url []string) (string, string) {
-	var protocol string
-	var host string
-
-	if len(url) != 2 {
-		protocol = "http"
-		host = url[0]
-	} else {
-		protocol = url[0]
-		host = url[1]
+	if err != nil {
+		return err
 	}
 
-	return protocol, host
+	return nil
 }
