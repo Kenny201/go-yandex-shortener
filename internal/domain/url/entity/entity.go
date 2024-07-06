@@ -2,6 +2,7 @@ package entity
 
 import (
 	"fmt"
+	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"math/rand"
 )
 
@@ -22,7 +23,7 @@ func NewURL(originalURL string, host string) *URL {
 	return &URL{
 		id:           shortURL,
 		originalURL:  originalURL,
-		fullShortURL: fmt.Sprintf("http://%v/%s", host, shortURL),
+		fullShortURL: fmt.Sprintf("%s://%s:%d/%s", config.Args.NetAddressExit.Scheme, config.Args.NetAddressExit.Host, config.Args.NetAddressExit.Port, shortURL),
 	}
 }
 

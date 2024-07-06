@@ -1,19 +1,26 @@
 package http
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
+)
 
 type Server struct {
-	urlHandler URLHandler
-	listenPort string
+	listenDomain string
+	listenPort   int
+	urlHandler   URLHandler
 }
 
-func NewServer(listenPort string, handler URLHandler) *Server {
+func NewServer(listenDomain string, listenPort int, handler URLHandler) *Server {
 	return &Server{
-		urlHandler: handler,
-		listenPort: listenPort,
+		listenDomain: listenDomain,
+		listenPort:   listenPort,
+		urlHandler:   handler,
 	}
 }
 
 func (s *Server) Start() error {
-	return http.ListenAndServe(s.listenPort, s.useRoutes())
+	listenHost := fmt.Sprintf("%s:%v", s.listenDomain, s.listenPort)
+
+	return http.ListenAndServe(listenHost, s.useRoutes())
 }
