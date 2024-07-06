@@ -46,12 +46,12 @@ func (us *Service) Put(url string, r *http.Request) (string, error) {
 			body = key.FullShortURL()
 		} else {
 			urlEntity := entity.NewURL(url, r.Host)
-			urlEntity, _ = us.Ur.Put(urlEntity)
+			urlEntity = us.Ur.Put(urlEntity)
 			body = urlEntity.FullShortURL()
 		}
 	} else {
 		urlEntity := entity.NewURL(url, r.Host)
-		urlEntity, _ = us.Ur.Put(urlEntity)
+		urlEntity = us.Ur.Put(urlEntity)
 		body = urlEntity.FullShortURL()
 	}
 
