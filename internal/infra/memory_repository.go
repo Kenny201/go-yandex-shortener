@@ -34,10 +34,10 @@ func (r *RepositoryMemory) GetAll() []entity.URL {
 	return urls
 }
 
-func (r *RepositoryMemory) Put(url *entity.URL) (*entity.URL, error) {
+func (r *RepositoryMemory) Put(url *entity.URL) *entity.URL {
 	r.urls[url.ID()] = url
 
-	return url, nil
+	return url
 }
 
 func (r *RepositoryMemory) CheckExistsOriginal(shortValue string) (*entity.URL, bool) {
