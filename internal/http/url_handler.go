@@ -2,6 +2,7 @@ package http
 
 import (
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/url/entity"
+	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 )
@@ -22,7 +23,7 @@ func NewURLHandler(us URLService) URLHandler {
 }
 
 func (uh URLHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id := chi.URLParam(r, "id")
 	url, err := uh.urlService.Get(id)
 
 	if err != nil {

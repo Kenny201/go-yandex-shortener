@@ -1,8 +1,10 @@
 package http
 
 import (
+	"context"
 	"fmt"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/url"
+	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -63,7 +65,10 @@ func TestGetByIDHandler(t *testing.T) {
 
 	for _, v := range urlStorage {
 		req, err := http.NewRequest(http.MethodGet, "http://localhost:8080/", nil)
-		req.SetPathValue("id", v.ID())
+
+		chiCtx := chi.NewRouteContext()
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
+		chiCtx.URLParams.Add("id", v.ID())
 
 		if err != nil {
 			t.Fatalf("method not alowed: %v", err)
