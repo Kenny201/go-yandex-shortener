@@ -2,7 +2,6 @@ package http
 
 import (
 	"context"
-	"fmt"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/url"
 	"github.com/go-chi/chi/v5"
 	"io"
@@ -21,13 +20,7 @@ func TestPostHandler(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	us, err := url.NewService(url.WithMemoryRepository())
-
-	if err != nil {
-		fmt.Printf("%v", err)
-
-		return
-	}
+	us := url.NewService(url.WithMemoryRepository())
 
 	NewURLHandler(us).PostHandler(w, req)
 
@@ -57,7 +50,7 @@ func TestGetByIDHandler(t *testing.T) {
 	}
 
 	responseForPost := httptest.NewRecorder()
-	us, _ := url.NewService(url.WithMemoryRepository())
+	us := url.NewService(url.WithMemoryRepository())
 	handler := NewURLHandler(us)
 	handler.PostHandler(responseForPost, req)
 
