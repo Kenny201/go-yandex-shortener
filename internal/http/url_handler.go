@@ -8,7 +8,7 @@ import (
 )
 
 type URLService interface {
-	Put(url string, r *http.Request) (string, error)
+	Put(url string, r *http.Request) string
 	Get(url string) (*entity.URL, error)
 }
 
@@ -49,7 +49,7 @@ func (uh URLHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, _ := uh.urlService.Put(string(body), r)
+	shortURL := uh.urlService.Put(string(body), r)
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
