@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/url"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http"
