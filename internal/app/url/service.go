@@ -7,33 +7,29 @@ import (
 	"net/http"
 )
 
-type Configuration func(us *Service) error
+type Storage func(us *Service)
 
 type Service struct {
 	Ur url.Repository
 }
 
-func NewService(cfgs ...Configuration) (*Service, error) {
+func NewService(storages ...Storage) *Service {
 	us := &Service{}
 
-	for _, cfg := range cfgs {
-		err := cfg(us)
-		if err != nil {
-			return nil, err
-		}
+	for _, storage := range storages {
+		storage(us)
 	}
 
-	return us, nil
+	return us
 }
 
-func WithRepository(ur url.Repository) Configuration {
-	return func(us *Service) error {
+func WithRepository(ur url.Repository) Storage {
+	return func(us *Service) {
 		us.Ur = ur
-		return nil
 	}
 }
 
-func WithMemoryRepository() Configuration {
+func WithMemoryRepository() Storage {
 	mr := infra.NewMemoryRepositories()
 	return WithRepository(mr)
 }

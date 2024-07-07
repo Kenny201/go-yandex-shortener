@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/url"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http"
@@ -14,11 +15,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	us, err := url.NewService(url.WithMemoryRepository())
-
-	if err != nil {
-		log.Fatal(err)
-	}
+	us := url.NewService(url.WithMemoryRepository())
 
 	urlHandler := http.NewURLHandler(us)
 
