@@ -32,8 +32,8 @@ func ParseFlags() error {
 }
 
 func setArgsFromEnv() error {
-	if envServerAddr := os.Getenv("SERVER_ADDRESS"); envServerAddr != "" {
-		hp, err := ParseServerAddress(envServerAddr)
+	if serverAddr := os.Getenv("SERVER_ADDRESS"); serverAddr != "" {
+		hp, err := ParseServerAddress(serverAddr)
 
 		if err != nil {
 			return err
@@ -47,8 +47,8 @@ func setArgsFromEnv() error {
 		}
 	}
 
-	if envBaseURL := os.Getenv("BASE_URL"); envBaseURL != "" {
-		protocol, hp, err := ParseBaseURL(envBaseURL)
+	if baseURL := os.Getenv("BASE_URL"); baseURL != "" {
+		protocol, hp, err := ParseBaseURL(baseURL)
 
 		if err != nil {
 			return err
