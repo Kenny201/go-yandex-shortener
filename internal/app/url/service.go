@@ -34,7 +34,7 @@ func WithMemoryRepository() Storage {
 	return WithRepository(mr)
 }
 
-func (us *Service) Put(url string, r *http.Request) (string, error) {
+func (us *Service) Put(url string, r *http.Request) string {
 	var body string
 
 	if len(us.Ur.GetAll()) != 0 {
@@ -51,7 +51,7 @@ func (us *Service) Put(url string, r *http.Request) (string, error) {
 		body = urlEntity.FullShortURL()
 	}
 
-	return body, nil
+	return body
 }
 
 func (us *Service) Get(url string) (*entity.URL, error) {
