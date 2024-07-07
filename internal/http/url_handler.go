@@ -26,7 +26,7 @@ func (uh URLHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	url, err := uh.urlService.Get(id)
 
 	if err != nil {
-		http.Error(w, "resource not found", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 
 		return
 	}
