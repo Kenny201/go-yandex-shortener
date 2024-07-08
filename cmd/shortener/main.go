@@ -9,11 +9,7 @@ import (
 
 func main() {
 	ss := shortener.NewService(shortener.WithMemoryRepository())
-	err := config.ParseFlags()
-
-	if err != nil {
-		log.Fatal(err)
-	}
+	config.ParseFlags()
 
 	urlHandler := http.NewShortenerHandler(ss)
 	server := http.NewServer(config.Args.ServerAddress, urlHandler)
