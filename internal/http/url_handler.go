@@ -49,7 +49,12 @@ func (sh ShortenerHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, _ := sh.shortenerService.Put(string(body), r)
+	shortURL, err := sh.shortenerService.Put(string(body), r)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
