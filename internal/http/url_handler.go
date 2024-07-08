@@ -1,29 +1,29 @@
 package http
 
 import (
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/url/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/aggregate"
 	"io"
 	"net/http"
 )
 
-type URLService interface {
-	Put(url string, r *http.Request) string
-	Get(url string) (*entity.URL, error)
+type ShortenerService interface {
+	Put(url string, r *http.Request) (string, error)
+	Get(url string) (*aggregate.URL, error)
 }
 
-type URLHandler struct {
-	urlService URLService
+type ShortenerHandler struct {
+	shortenerService ShortenerService
 }
 
-func NewURLHandler(us URLService) URLHandler {
-	return URLHandler{
-		urlService: us,
+func NewShortenerHandler(ss ShortenerService) ShortenerHandler {
+	return ShortenerHandler{
+		shortenerService: ss,
 	}
 }
 
-func (uh URLHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
+func (sh ShortenerHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	url, err := uh.urlService.Get(id)
+	url, err := sh.shortenerService.Get(id)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -31,11 +31,11 @@ func (uh URLHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Location", url.OriginalURL())
+	w.Header().Set("Location", url.BaseURL().ToString())
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (uh URLHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
+func (sh ShortenerHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 
 	if err != nil {
@@ -48,7 +48,7 @@ func (uh URLHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL := uh.urlService.Put(string(body), r)
+	shortURL, _ := sh.shortenerService.Put(string(body), r)
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
