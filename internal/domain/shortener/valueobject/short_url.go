@@ -11,18 +11,18 @@ const (
 )
 
 type ShortURL struct {
-	serverAddress ServerAddress
-	shortString   string
+	baseURL     BaseURL
+	shortString string
 }
 
-func NewShortURL(originalURL ServerAddress) ShortURL {
+func NewShortURL(baseURL BaseURL) ShortURL {
 	shortString := generateShortKey()
 
-	return ShortURL{originalURL, shortString}
+	return ShortURL{baseURL, shortString}
 }
 
 func (su ShortURL) ToString() string {
-	return fmt.Sprintf("%s://%s:%d/%s", su.serverAddress.scheme, su.serverAddress.host, su.serverAddress.port, su.shortString)
+	return fmt.Sprintf("%s/%s", su.baseURL.ToString(), su.shortString)
 }
 
 func (su ShortURL) ShortString() string {

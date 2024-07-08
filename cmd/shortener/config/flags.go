@@ -7,16 +7,13 @@ import (
 )
 
 var Args struct {
-	NetAddressEntrance netAddressEntrance
-	NetAddressExit     netAddressExit
+	ServerAddress string
+	BaseURL       string
 }
 
 func ParseFlags() error {
-	_ = flag.Value(&Args.NetAddressEntrance)
-	_ = flag.Value(&Args.NetAddressExit)
-
-	flag.Var(&Args.NetAddressEntrance, "a", "Net address host:port")
-	flag.Var(&Args.NetAddressExit, "b", "Result net address host:port")
+	flag.StringVar(&Args.ServerAddress, "a", ":8080", "server address host:port")
+	flag.StringVar(&Args.BaseURL, "b", "http://localhost:8080", "Result net address host:port")
 	flag.Parse()
 
 	err := setArgsFromEnv()
@@ -24,9 +21,6 @@ func ParseFlags() error {
 	if err != nil {
 		return err
 	}
-
-	setDefaultValueEntrance()
-	setDefaultValueOnExit()
 
 	return nil
 }
@@ -64,19 +58,4 @@ func setArgsFromEnv() error {
 	}
 
 	return nil
-}
-
-func setDefaultValueEntrance() {
-	if Args.NetAddressEntrance.Port == 0 && Args.NetAddressEntrance.Host == "" {
-		Args.NetAddressEntrance.Host = "localhost"
-		Args.NetAddressEntrance.Port = 8080
-	}
-}
-
-func setDefaultValueOnExit() {
-	if Args.NetAddressExit.Port == 0 && Args.NetAddressExit.Host == "" {
-		Args.NetAddressExit.Scheme = "http"
-		Args.NetAddressExit.Host = "localhost"
-		Args.NetAddressExit.Port = 8080
-	}
 }

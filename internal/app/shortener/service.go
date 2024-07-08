@@ -1,7 +1,7 @@
 package shortener
 
 import (
-	"fmt"
+	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/aggregate"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
@@ -33,43 +33,37 @@ func WithRepository(sr shortener.Repository) Storage {
 
 func WithMemoryRepository() Storage {
 	mr := infra.NewMemoryRepositories()
+
 	return WithRepository(mr)
 }
 
 func (ss *Service) Put(url string, r *http.Request) (string, error) {
 	var body valueobject.ShortURL
-	var host string
 
-	if r.TLS != nil {
-		host = fmt.Sprintf("https://%s", r.Host)
-	} else {
-		host = fmt.Sprintf("http://%s", r.Host)
-	}
-
-	serverAddress, err := valueobject.NewServerAddress(host)
+	originalURL, err := valueobject.NewOriginalURL(url)
 
 	if err != nil {
 		return "", err
 	}
 
-	baseURL, err := valueobject.NewBaseURL(url)
+	baseURL, err := valueobject.NewBaseURL(config.Args.BaseURL)
 
 	if err != nil {
 		return "", err
 	}
 
-	shortURL := valueobject.NewShortURL(serverAddress)
+	shortURL := valueobject.NewShortURL(baseURL)
 
 	if len(ss.Sr.GetAll()) != 0 {
 		if key, ok := ss.Sr.CheckExistsBaseURL(url); ok {
 			body = key.ShortURL()
 		} else {
-			urlEntity := aggregate.NewURL(baseURL, shortURL)
+			urlEntity := aggregate.NewURL(originalURL, shortURL)
 			urlEntity, err = ss.Sr.Put(urlEntity)
 			body = urlEntity.ShortURL()
 		}
 	} else {
-		urlEntity := aggregate.NewURL(baseURL, shortURL)
+		urlEntity := aggregate.NewURL(originalURL, shortURL)
 		urlEntity, err = ss.Sr.Put(urlEntity)
 		body = urlEntity.ShortURL()
 	}
