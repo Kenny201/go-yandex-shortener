@@ -12,7 +12,7 @@ func main() {
 	config.ParseFlags()
 
 	urlHandler := http.NewShortenerHandler(ss)
+	server := http.NewServer(config.Args.ServerAddress, urlHandler)
 
-	server := http.NewServer(config.Args.NetAddressEntrance.Host, config.Args.NetAddressEntrance.Port, urlHandler)
 	log.Fatal(server.Start())
 }

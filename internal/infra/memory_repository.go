@@ -42,7 +42,6 @@ func (r *RepositoryMemory) Put(url *aggregate.URL) (*aggregate.URL, error) {
 
 func (r *RepositoryMemory) CheckExistsBaseURL(baseURL string) (*aggregate.URL, bool) {
 	for _, value := range r.urls {
-
 		if value.BaseURL().ToString() == baseURL {
 			return value, true
 		}

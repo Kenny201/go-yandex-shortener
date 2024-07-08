@@ -12,9 +12,13 @@ type BaseURL struct {
 	port   int
 }
 
-func NewBaseURL(baseURL string) (BaseURL, error) {
-	scheme, hp, err := ParseBaseURL(baseURL)
+func NewBaseURL(host string) (BaseURL, error) {
+	scheme, hp, err := ParseBaseURL(host)
 	var port int
+
+	if err != nil {
+		return BaseURL{}, err
+	}
 
 	if len(hp) == 2 {
 		port, err = strconv.Atoi(hp[1])
@@ -27,29 +31,34 @@ func NewBaseURL(baseURL string) (BaseURL, error) {
 	return BaseURL{scheme, hp[0], port}, nil
 }
 
-func (bu BaseURL) ToString() string {
-	if bu.port != 0 {
-		return fmt.Sprintf("%s://%s:%d", bu.scheme, bu.host, bu.port)
+func (sa BaseURL) ToString() string {
+	if sa.port == 0 {
+		return fmt.Sprintf("%s://%s", sa.scheme, sa.host)
 	}
 
-	return fmt.Sprintf("%s://%s", bu.scheme, bu.host)
+	return fmt.Sprintf("%s://%s:%d", sa.scheme, sa.host, sa.port)
+}
+
+func (sa BaseURL) Host() string {
+	return sa.host
+}
+
+func (sa BaseURL) Port() int {
+	return sa.port
 }
 
 func ParseBaseURL(s string) (string, []string, error) {
-	var protocol string
-	var host string
+	host := strings.Split(s, "://")
+	var hp []string
+	var scheme string
 
-	url := strings.Split(s, "://")
-
-	if len(url) != 2 {
-		protocol = "http"
-		host = url[0]
+	if len(host) == 1 {
+		scheme = "http"
+		hp = strings.Split(host[0], ":")
 	} else {
-		protocol = url[0]
-		host = url[1]
+		scheme = host[0]
+		hp = strings.Split(host[1], ":")
 	}
 
-	hp := strings.Split(host, ":")
-
-	return protocol, hp, nil
+	return scheme, hp, nil
 }
