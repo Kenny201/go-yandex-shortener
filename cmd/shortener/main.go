@@ -1,15 +1,15 @@
 package main
 
 import (
-	"github.com/Kenny201/go-yandex-shortener.git/internal/app/url"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http"
 	"log"
 )
 
 func main() {
-	us := url.NewService(url.WithMemoryRepository())
+	ss := shortener.NewService(shortener.WithMemoryRepository())
 
-	urlHandler := http.NewURLHandler(us)
+	urlHandler := http.NewShortenerHandler(ss)
 
 	server := http.NewServer(":8080", urlHandler)
 	log.Fatal(server.Start())
