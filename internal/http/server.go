@@ -6,16 +6,16 @@ import (
 )
 
 type Server struct {
-	listenDomain string
-	listenPort   int
-	urlHandler   URLHandler
+	shortenerHandler ShortenerHandler
+	listenPort       string
+	listenDomain     string
 }
 
-func NewServer(listenDomain string, listenPort int, handler URLHandler) *Server {
+func NewServer(listenDomain string, listenPort int, handler ShortenerHandler) *Server {
 	return &Server{
-		listenDomain: listenDomain,
-		listenPort:   listenPort,
-		urlHandler:   handler,
+		shortenerHandler: handler,
+		listenPort:       listenPort,
+		listenDomain:     listenDomain,
 	}
 }
 
