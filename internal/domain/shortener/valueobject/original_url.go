@@ -12,8 +12,8 @@ type OriginalURL struct {
 	port   int
 }
 
-func NewOriginalURL(baseURL string) (OriginalURL, error) {
-	scheme, hp, err := ParseOriginalURL(baseURL)
+func NewOriginalURL(originalURL string) (OriginalURL, error) {
+	scheme, hp, err := ParseOriginalURL(originalURL)
 	var port int
 
 	if len(hp) == 2 {
@@ -27,24 +27,24 @@ func NewOriginalURL(baseURL string) (OriginalURL, error) {
 	return OriginalURL{scheme, hp[0], port}, nil
 }
 
-func (bu OriginalURL) Scheme() string {
-	return bu.scheme
+func (ou OriginalURL) Scheme() string {
+	return ou.scheme
 }
 
-func (bu OriginalURL) Host() string {
-	return bu.host
+func (ou OriginalURL) Host() string {
+	return ou.host
 }
 
-func (bu OriginalURL) Port() int {
-	return bu.port
+func (ou OriginalURL) Port() int {
+	return ou.port
 }
 
-func (bu OriginalURL) ToString() string {
-	if bu.port != 0 {
-		return fmt.Sprintf("%s://%s:%d", bu.scheme, bu.host, bu.port)
+func (ou OriginalURL) ToString() string {
+	if ou.port != 0 {
+		return fmt.Sprintf("%s://%s:%d", ou.scheme, ou.host, ou.port)
 	}
 
-	return fmt.Sprintf("%s://%s", bu.scheme, bu.host)
+	return fmt.Sprintf("%s://%s", ou.scheme, ou.host)
 }
 
 func ParseOriginalURL(s string) (string, []string, error) {

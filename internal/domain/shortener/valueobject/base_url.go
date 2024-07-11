@@ -31,20 +31,20 @@ func NewBaseURL(host string) (BaseURL, error) {
 	return BaseURL{scheme, hp[0], port}, nil
 }
 
-func (sa BaseURL) ToString() string {
-	if sa.port == 0 {
-		return fmt.Sprintf("%s://%s", sa.scheme, sa.host)
+func (bu BaseURL) ToString() string {
+	if bu.port == 0 {
+		return fmt.Sprintf("%s://%s", bu.scheme, bu.host)
 	}
 
-	return fmt.Sprintf("%s://%s:%d", sa.scheme, sa.host, sa.port)
+	return fmt.Sprintf("%s://%s:%d", bu.scheme, bu.host, bu.port)
 }
 
-func (sa BaseURL) Host() string {
-	return sa.host
+func (bu BaseURL) Host() string {
+	return bu.host
 }
 
-func (sa BaseURL) Port() int {
-	return sa.port
+func (bu BaseURL) Port() int {
+	return bu.port
 }
 
 func ParseBaseURL(s string) (string, []string, error) {
