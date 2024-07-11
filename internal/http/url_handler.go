@@ -32,7 +32,7 @@ func (sh ShortenerHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Location", url.BaseURL().ToString())
+	w.Header().Set("Location", url.OriginalURL().ToString())
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 

@@ -55,7 +55,7 @@ func (ss *Service) Put(url string, r *http.Request) (string, error) {
 	shortURL := valueobject.NewShortURL(baseURL)
 
 	if len(ss.Sr.GetAll()) != 0 {
-		if key, ok := ss.Sr.CheckExistsBaseURL(url); ok {
+		if key, ok := ss.Sr.CheckExistsOriginalURL(url); ok {
 			body = key.ShortURL()
 		} else {
 			urlEntity := aggregate.NewURL(originalURL, shortURL)
