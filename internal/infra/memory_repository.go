@@ -17,7 +17,7 @@ func NewMemoryRepositories() *RepositoryMemory {
 
 func (r *RepositoryMemory) Get(id string) (*aggregate.URL, error) {
 	if _, ok := r.urls[id]; !ok {
-		err := errors.New("short shortener not found")
+		err := errors.New("url not found")
 		return nil, err
 	}
 
