@@ -8,7 +8,7 @@ import (
 )
 
 type ShortenerService interface {
-	Put(url string, r *http.Request) (string, error)
+	Put(url string) (string, error)
 	Get(url string) (*aggregate.URL, error)
 }
 
@@ -49,7 +49,7 @@ func (sh ShortenerHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := sh.shortenerService.Put(string(body), r)
+	shortURL, err := sh.shortenerService.Put(string(body))
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

@@ -6,7 +6,6 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/aggregate"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra"
-	"net/http"
 )
 
 type Storage func(s *Service)
@@ -37,7 +36,7 @@ func WithRepositoryMemory() Storage {
 	return WithRepository(mr)
 }
 
-func (s *Service) Put(url string, r *http.Request) (string, error) {
+func (s *Service) Put(url string) (string, error) {
 	var body string
 
 	originalURL, err := valueobject.NewOriginalURL(url)
