@@ -38,7 +38,7 @@ func WithMemoryRepository() Storage {
 }
 
 func (ss *Service) Put(url string, r *http.Request) (string, error) {
-	var body valueobject.ShortURL
+	var body string
 
 	originalURL, err := valueobject.NewOriginalURL(url)
 
@@ -56,23 +56,23 @@ func (ss *Service) Put(url string, r *http.Request) (string, error) {
 
 	if len(ss.Sr.GetAll()) != 0 {
 		if key, ok := ss.Sr.CheckExistsOriginalURL(url); ok {
-			body = key.ShortURL()
+			body = key.ShortURL().ToString()
 		} else {
 			urlEntity := aggregate.NewURL(originalURL, shortURL)
 			urlEntity, err = ss.Sr.Put(urlEntity)
-			body = urlEntity.ShortURL()
+			body = urlEntity.ShortURL().ToString()
 		}
 	} else {
 		urlEntity := aggregate.NewURL(originalURL, shortURL)
 		urlEntity, err = ss.Sr.Put(urlEntity)
-		body = urlEntity.ShortURL()
+		body = urlEntity.ShortURL().ToString()
 	}
 
 	if err != nil {
 		return "", err
 	}
 
-	return body.ToString(), nil
+	return body, nil
 }
 
 func (ss *Service) Get(url string) (*aggregate.URL, error) {
