@@ -9,25 +9,25 @@ import (
 	"net/http"
 )
 
-type Storage func(ss *Service)
+type Storage func(s *Service)
 
 type Service struct {
 	Sr shortener.Repository
 }
 
 func NewService(storages ...Storage) *Service {
-	ss := &Service{}
+	s := &Service{}
 
 	for _, storage := range storages {
-		storage(ss)
+		storage(s)
 	}
 
-	return ss
+	return s
 }
 
 func WithRepository(sr shortener.Repository) Storage {
-	return func(ss *Service) {
-		ss.Sr = sr
+	return func(s *Service) {
+		s.Sr = sr
 	}
 }
 
@@ -36,7 +36,7 @@ func WithMemoryRepository() Storage {
 	return WithRepository(mr)
 }
 
-func (ss *Service) Put(url string, r *http.Request) (string, error) {
+func (s *Service) Put(url string, r *http.Request) (string, error) {
 	var body string
 	var host string
 
@@ -60,17 +60,17 @@ func (ss *Service) Put(url string, r *http.Request) (string, error) {
 
 	shortURL := valueobject.NewShortURL(serverAddress)
 
-	if len(ss.Sr.GetAll()) != 0 {
-		if key, ok := ss.Sr.CheckExistsBaseURL(url); ok {
+	if len(s.Sr.GetAll()) != 0 {
+		if key, ok := s.Sr.CheckExistsBaseURL(url); ok {
 			body = key.ShortURL().ToString()
 		} else {
 			urlEntity := aggregate.NewURL(baseURL, shortURL)
-			urlEntity, err = ss.Sr.Put(urlEntity)
+			urlEntity, err = s.Sr.Put(urlEntity)
 			body = urlEntity.ShortURL().ToString()
 		}
 	} else {
 		urlEntity := aggregate.NewURL(baseURL, shortURL)
-		urlEntity, err = ss.Sr.Put(urlEntity)
+		urlEntity, err = s.Sr.Put(urlEntity)
 		body = urlEntity.ShortURL().ToString()
 	}
 
@@ -81,8 +81,8 @@ func (ss *Service) Put(url string, r *http.Request) (string, error) {
 	return body, nil
 }
 
-func (ss *Service) Get(url string) (*aggregate.URL, error) {
-	result, err := ss.Sr.Get(url)
+func (s *Service) Get(url string) (*aggregate.URL, error) {
+	result, err := s.Sr.Get(url)
 
 	if err != nil {
 		return nil, err
