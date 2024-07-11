@@ -83,6 +83,7 @@ func (ss *Service) Put(url string, r *http.Request) (string, error) {
 
 func (ss *Service) Get(url string) (*aggregate.URL, error) {
 	result, err := ss.Sr.Get(url)
+
 	if err != nil {
 		return nil, err
 	}
