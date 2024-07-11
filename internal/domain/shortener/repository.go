@@ -8,5 +8,5 @@ type Repository interface {
 	Get(id string) (*aggregate.URL, error)
 	GetAll() []aggregate.URL
 	Put(url *aggregate.URL) (*aggregate.URL, error)
-	CheckExistsBaseURL(baseURL string) (*aggregate.URL, bool)
+	CheckExistsOriginalURL(baseURL string) (*aggregate.URL, bool)
 }

@@ -5,16 +5,16 @@ import (
 )
 
 type URL struct {
-	id       string
-	baseURL  valueobject.OriginalURL
-	shortURL valueobject.ShortURL
+	id          string
+	originalURL valueobject.OriginalURL
+	shortURL    valueobject.ShortURL
 }
 
-func NewURL(baseURL valueobject.OriginalURL, shortURL valueobject.ShortURL) *URL {
+func NewURL(originalURL valueobject.OriginalURL, shortURL valueobject.ShortURL) *URL {
 	return &URL{
-		id:       shortURL.ShortString(),
-		baseURL:  baseURL,
-		shortURL: shortURL,
+		id:          shortURL.ShortString(),
+		originalURL: originalURL,
+		shortURL:    shortURL,
 	}
 }
 
@@ -22,8 +22,8 @@ func (u *URL) ID() string {
 	return u.id
 }
 
-func (u *URL) BaseURL() valueobject.OriginalURL {
-	return u.baseURL
+func (u *URL) OriginalURL() valueobject.OriginalURL {
+	return u.originalURL
 }
 
 func (u *URL) ShortURL() valueobject.ShortURL {
