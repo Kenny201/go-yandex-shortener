@@ -31,8 +31,8 @@ func WithRepository(sr shortener.Repository) Storage {
 	}
 }
 
-func WithMemoryRepository() Storage {
-	mr := infra.NewMemoryRepositories()
+func WithRepositoryMemory() Storage {
+	mr := infra.NewRepositoryMemory()
 	return WithRepository(mr)
 }
 
