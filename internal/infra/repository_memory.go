@@ -9,39 +9,39 @@ type RepositoryMemory struct {
 	urls map[string]*aggregate.URL
 }
 
-func NewMemoryRepositories() *RepositoryMemory {
+func NewRepositoryMemory() *RepositoryMemory {
 	return &RepositoryMemory{
 		urls: make(map[string]*aggregate.URL),
 	}
 }
 
-func (r *RepositoryMemory) Get(id string) (*aggregate.URL, error) {
-	if _, ok := r.urls[id]; !ok {
+func (rm *RepositoryMemory) Get(id string) (*aggregate.URL, error) {
+	if _, ok := rm.urls[id]; !ok {
 		err := errors.New("url not found")
 		return nil, err
 	}
 
-	return r.urls[id], nil
+	return rm.urls[id], nil
 }
 
-func (r *RepositoryMemory) GetAll() []aggregate.URL {
+func (rm *RepositoryMemory) GetAll() []aggregate.URL {
 	var urls []aggregate.URL
 
-	for _, url := range r.urls {
+	for _, url := range rm.urls {
 		urls = append(urls, *url)
 	}
 
 	return urls
 }
 
-func (r *RepositoryMemory) Put(url *aggregate.URL) (*aggregate.URL, error) {
-	r.urls[url.ID()] = url
+func (rm *RepositoryMemory) Put(url *aggregate.URL) (*aggregate.URL, error) {
+	rm.urls[url.ID()] = url
 
 	return url, nil
 }
 
-func (r *RepositoryMemory) CheckExistsOriginalURL(originalURL string) (*aggregate.URL, bool) {
-	for _, value := range r.urls {
+func (rm *RepositoryMemory) CheckExistsOriginalURL(originalURL string) (*aggregate.URL, bool) {
+	for _, value := range rm.urls {
 		if value.OriginalURL().ToString() == originalURL {
 			return value, true
 		}

@@ -20,7 +20,7 @@ func TestPostHandler(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	ss := shortener.NewService(shortener.WithMemoryRepository())
+	ss := shortener.NewService(shortener.WithRepositoryMemory())
 
 	NewShortenerHandler(ss).PostHandler(w, req)
 
@@ -50,7 +50,7 @@ func TestGetByIDHandler(t *testing.T) {
 	}
 
 	responseForPost := httptest.NewRecorder()
-	ss := shortener.NewService(shortener.WithMemoryRepository())
+	ss := shortener.NewService(shortener.WithRepositoryMemory())
 	handler := NewShortenerHandler(ss)
 	handler.PostHandler(responseForPost, req)
 

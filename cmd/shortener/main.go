@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	ss := shortener.NewService(shortener.WithMemoryRepository())
+	ss := shortener.NewService(shortener.WithRepositoryMemory())
 	config.ParseFlags()
 
 	urlHandler := http.NewShortenerHandler(ss)
