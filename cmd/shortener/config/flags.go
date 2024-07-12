@@ -11,7 +11,7 @@ var Args struct {
 }
 
 func ParseFlags() {
-	flag.StringVar(&Args.ServerAddress, "a", ":8080", "server address host:port")
+	flag.StringVar(&Args.ServerAddress, "a", ":8080", "Server address host:port")
 	flag.StringVar(&Args.BaseURL, "b", "http://localhost:8080", "Result net address host:port")
 	flag.Parse()
 
@@ -19,11 +19,11 @@ func ParseFlags() {
 }
 
 func setArgsFromEnv() {
-	if serverAddr := os.Getenv("SERVER_ADDRESS"); serverAddr != "" {
+	if serverAddr := os.Getenv("SHORTENER_SERVER_ADDRESS"); serverAddr != "" {
 		Args.ServerAddress = serverAddr
 	}
 
-	if baseURL := os.Getenv("BASE_URL"); baseURL != "" {
+	if baseURL := os.Getenv("SHORTENER_BASE_URL"); baseURL != "" {
 		Args.BaseURL = baseURL
 	}
 }
