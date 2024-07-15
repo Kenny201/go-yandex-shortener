@@ -6,7 +6,7 @@ import (
 
 type Repository interface {
 	Get(id string) (*aggregate.URL, error)
-	GetAll() []aggregate.URL
+	GetAll() map[string]*aggregate.URL
 	Put(url *aggregate.URL) (*aggregate.URL, error)
 	CheckExistsOriginalURL(baseURL string) (*aggregate.URL, bool)
 }
