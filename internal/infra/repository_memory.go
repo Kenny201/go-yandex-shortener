@@ -24,14 +24,8 @@ func (rm *RepositoryMemory) Get(id string) (*aggregate.URL, error) {
 	return rm.urls[id], nil
 }
 
-func (rm *RepositoryMemory) GetAll() []aggregate.URL {
-	var urls []aggregate.URL
-
-	for _, url := range rm.urls {
-		urls = append(urls, *url)
-	}
-
-	return urls
+func (rm *RepositoryMemory) GetAll() map[string]*aggregate.URL {
+	return rm.urls
 }
 
 func (rm *RepositoryMemory) Put(url *aggregate.URL) (*aggregate.URL, error) {
