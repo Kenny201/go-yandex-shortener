@@ -27,7 +27,6 @@ func (sh ShortenerHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
-
 		return
 	}
 
@@ -37,8 +36,14 @@ func (sh ShortenerHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request
 
 func (sh ShortenerHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
+	var shortURL string
 
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err = r.Body.Close(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -48,7 +53,7 @@ func (sh ShortenerHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := sh.shortenerService.Put(string(body), r)
+	shortURL, err = sh.shortenerService.Put(string(body), r)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
