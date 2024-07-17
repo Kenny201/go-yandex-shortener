@@ -6,11 +6,11 @@ import (
 
 type URL struct {
 	id          string
-	originalURL valueobject.OriginalURL
+	originalURL string
 	shortURL    valueobject.ShortURL
 }
 
-func NewURL(originalURL valueobject.OriginalURL, shortURL valueobject.ShortURL) *URL {
+func NewURL(originalURL string, shortURL valueobject.ShortURL) *URL {
 	return &URL{
 		id:          shortURL.ShortString(),
 		originalURL: originalURL,
@@ -18,14 +18,17 @@ func NewURL(originalURL valueobject.OriginalURL, shortURL valueobject.ShortURL) 
 	}
 }
 
+// Получить ID
 func (u *URL) ID() string {
 	return u.id
 }
 
-func (u *URL) OriginalURL() valueobject.OriginalURL {
+// Получить URL на который будет редирект
+func (u *URL) OriginalURL() string {
 	return u.originalURL
 }
 
+// Получить короткую ссылку
 func (u *URL) ShortURL() valueobject.ShortURL {
 	return u.shortURL
 }

@@ -2,7 +2,9 @@ package http
 
 import (
 	"context"
+	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
@@ -12,74 +14,147 @@ import (
 )
 
 func TestPostHandler(t *testing.T) {
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8080/", strings.NewReader("https://practicum.yandex.ru"))
-
-	if err != nil {
-		t.Fatalf("method not alowed: %v", err)
+	tests := []struct {
+		name                    string
+		body                    string
+		wantResponseContentType string
+		wantStatusCode          int
+	}{
+		{
+			name:                    "post request for body https://yandex.ru",
+			body:                    "https://yandex.ru",
+			wantResponseContentType: "text/plain",
+			wantStatusCode:          http.StatusCreated,
+		},
+		{
+			name:                    "post request for body https://practicum.yandex.ru",
+			body:                    "https://practicum.yandex.ru",
+			wantResponseContentType: "text/plain",
+			wantStatusCode:          http.StatusCreated,
+		},
+		{
+			name:                    "post request for empty body",
+			body:                    "",
+			wantResponseContentType: "text/plain; charset=utf-8",
+			wantStatusCode:          http.StatusBadRequest,
+		},
 	}
 
-	w := httptest.NewRecorder()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := config.NewArgs()
+			args.SetArgs(":8080", "http://localhost:8080")
 
-	ss := shortener.NewService(shortener.WithRepositoryMemory())
+			req, err := http.NewRequest(http.MethodPost, "http://localhost:8080/", strings.NewReader(tt.body))
 
-	NewShortenerHandler(ss).PostHandler(w, req)
+			if err != nil {
+				t.Fatalf("method not alowed: %v", err)
+			}
 
-	res := w.Result()
-	defer res.Body.Close()
+			w := httptest.NewRecorder()
 
-	if res.StatusCode != http.StatusCreated {
-		t.Errorf("excpected statud OK; got %v", res.StatusCode)
-	}
+			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
 
-	if ctype := w.Header().Get("Content-Type"); ctype != "text/plain" {
-		t.Errorf("content type header does not match: got %v want %v",
-			ctype, "text/plain")
-	}
+			NewShortenerHandler(ss).PostHandler(w, req)
 
-	_, err = io.ReadAll(res.Body)
+			res := w.Result()
 
-	if err != nil {
-		t.Fatalf("could not read response:%v", err)
+			if res.StatusCode != tt.wantStatusCode {
+				t.Errorf("excpected status %v; got %v", tt.wantStatusCode, res.StatusCode)
+			}
+
+			if ctype := res.Header.Get("Content-Type"); ctype != tt.wantResponseContentType {
+				t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
+					ctype, tt.wantResponseContentType)
+			}
+
+			_, err = io.ReadAll(res.Body)
+
+			defer func() {
+				err := res.Body.Close()
+				if err != nil {
+					t.Errorf("failed to close response body: %v", err)
+				}
+			}()
+
+			if err != nil {
+				t.Fatalf("could not read response:%v", err)
+			}
+		})
 	}
 }
 
 func TestGetByIDHandler(t *testing.T) {
-	req, err := http.NewRequest(http.MethodPost, "http://localhost:8080", strings.NewReader("https://practicum.yandex.ru"))
-	if err != nil {
-		t.Fatalf("method not alowed: %v", err)
+	tests := []struct {
+		name               string
+		body               string
+		wantLocationHeader string
+		wantStatusCode     int
+	}{
+		{
+			name:               "redirect for body https://yandex.ru",
+			body:               "https://yandex.ru",
+			wantLocationHeader: "https://yandex.ru",
+			wantStatusCode:     http.StatusOK,
+		},
+		{
+			name:               "redirect for body https://practicum.yandex.ru",
+			body:               "https://practicum.yandex.ru",
+			wantLocationHeader: "https://practicum.yandex.ru",
+			wantStatusCode:     http.StatusOK,
+		},
 	}
 
-	responseForPost := httptest.NewRecorder()
-	ss := shortener.NewService(shortener.WithRepositoryMemory())
-	handler := NewShortenerHandler(ss)
-	handler.PostHandler(responseForPost, req)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 
-	urlStorage := ss.Sr.GetAll()
+			// Установка аргументов командной строки
+			args := config.NewArgs()
+			args.SetArgs(":8080", "http://localhost:8080")
 
-	for _, v := range urlStorage {
-		req, err := http.NewRequest(http.MethodGet, "http://localhost:8080/", nil)
+			req, err := http.NewRequest(http.MethodPost, "http://localhost:8080", strings.NewReader(tt.body))
 
-		chiCtx := chi.NewRouteContext()
-		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
-		chiCtx.URLParams.Add("id", v.ID())
+			if err != nil {
+				t.Fatalf("method not alowed: %v", err)
+			}
 
-		if err != nil {
-			t.Fatalf("method not alowed: %v", err)
-		}
+			responseForPost := httptest.NewRecorder()
+			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
+			handler := NewShortenerHandler(ss)
+			handler.PostHandler(responseForPost, req)
 
-		responseForGet := httptest.NewRecorder()
-		handler.GetByIDHandler(responseForGet, req)
-		res := responseForGet.Result()
+			urlStorage := ss.Sr.GetAll()
 
-		if res.StatusCode != http.StatusTemporaryRedirect {
-			t.Errorf("excpected status 307; got %v", res.StatusCode)
-		}
+			for _, v := range urlStorage {
+				req, err := http.NewRequest(http.MethodGet, "http://localhost:8080/", nil)
 
-		if location := responseForGet.Header().Get("Location"); location != "https://practicum.yandex.ru" {
-			t.Errorf("location header does not match: got %v want %v",
-				location, "https://practicum.yandex.ru")
-		}
+				chiCtx := chi.NewRouteContext()
+				req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
+				chiCtx.URLParams.Add("id", v.ID())
 
-		res.Body.Close()
+				if err != nil {
+					t.Fatalf("method not alowed: %v", err)
+				}
+
+				responseForGet := httptest.NewRecorder()
+				handler.GetByIDHandler(responseForGet, req)
+				res := responseForGet.Result()
+
+				if res.StatusCode != http.StatusTemporaryRedirect {
+					t.Errorf("excpected status 307; got %v", res.StatusCode)
+				}
+
+				if location := res.Header.Get("Location"); location != tt.wantLocationHeader {
+					t.Errorf("location header does not match: got %v want %v",
+						location, tt.wantLocationHeader)
+				}
+
+				err = res.Body.Close()
+
+				if err != nil {
+					t.Errorf("failed to close response body: %v", err)
+				}
+			}
+		})
 	}
 }

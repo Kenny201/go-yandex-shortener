@@ -1,8 +1,9 @@
-package infra
+package storage
 
 import (
-	"errors"
+	"fmt"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/aggregate"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
 )
 
 type RepositoryMemory struct {
@@ -16,29 +17,35 @@ func NewRepositoryMemory() *RepositoryMemory {
 }
 
 func (rm *RepositoryMemory) Get(id string) (*aggregate.URL, error) {
-	if _, ok := rm.urls[id]; !ok {
-		err := errors.New("url not found")
+	url, ok := rm.urls[id]
+
+	if !ok {
+		err := fmt.Errorf("url not found: %v", id)
 		return nil, err
 	}
 
-	return rm.urls[id], nil
+	return url, nil
 }
 
 func (rm *RepositoryMemory) GetAll() map[string]*aggregate.URL {
 	return rm.urls
 }
 
-func (rm *RepositoryMemory) Put(url *aggregate.URL) (*aggregate.URL, error) {
-	rm.urls[url.ID()] = url
+func (rm *RepositoryMemory) Put(originalURL string, shortURL valueobject.ShortURL) *aggregate.URL {
+	urlEntity := aggregate.NewURL(originalURL, shortURL)
 
-	return url, nil
+	rm.urls[urlEntity.ID()] = urlEntity
+
+	return urlEntity
 }
 
 func (rm *RepositoryMemory) CheckExistsOriginalURL(originalURL string) (*aggregate.URL, bool) {
 	for _, value := range rm.urls {
-		if value.OriginalURL().ToString() == originalURL {
+
+		if value.OriginalURL() == originalURL {
 			return value, true
 		}
+
 	}
 
 	return nil, false

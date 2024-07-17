@@ -1,52 +1,33 @@
 package shortener
 
 import (
-	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/aggregate"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra"
 )
 
-type Storage func(s *Service)
-
-type Service struct {
-	Sr shortener.Repository
+type Repository interface {
+	Get(id string) (*aggregate.URL, error)
+	GetAll() map[string]*aggregate.URL
+	Put(originalURL string, shortURL valueobject.ShortURL) *aggregate.URL
+	CheckExistsOriginalURL(originalURL string) (*aggregate.URL, bool)
 }
 
-func NewService(storages ...Storage) *Service {
-	s := &Service{}
+type Service struct {
+	BaseURL string
+	Sr      Repository
+}
 
-	for _, storage := range storages {
-		storage(s)
-	}
+func NewService(baseURL string, repository Repository) *Service {
+	s := &Service{}
+	s.Sr = repository
+	s.BaseURL = baseURL
 
 	return s
 }
 
-func WithRepository(sr shortener.Repository) Storage {
-	return func(s *Service) {
-		s.Sr = sr
-	}
-}
-
-func WithRepositoryMemory() Storage {
-	mr := infra.NewRepositoryMemory()
-
-	return WithRepository(mr)
-}
-
+// Put Сохранить url в хранилище
 func (s *Service) Put(url string) (string, error) {
-	var body string
-
-	originalURL, err := valueobject.NewOriginalURL(url)
-
-	if err != nil {
-		return "", err
-	}
-
-	baseURL, err := valueobject.NewBaseURL(config.Args.BaseURL)
-
+	baseURL, err := valueobject.NewBaseURL(s.BaseURL)
 	if err != nil {
 		return "", err
 	}
@@ -55,25 +36,16 @@ func (s *Service) Put(url string) (string, error) {
 
 	if len(s.Sr.GetAll()) != 0 {
 		if key, ok := s.Sr.CheckExistsOriginalURL(url); ok {
-			body = key.ShortURL().ToString()
-		} else {
-			urlEntity := aggregate.NewURL(originalURL, shortURL)
-			urlEntity, err = s.Sr.Put(urlEntity)
-			body = urlEntity.ShortURL().ToString()
+			return key.ShortURL().ToString(), nil
 		}
-	} else {
-		urlEntity := aggregate.NewURL(originalURL, shortURL)
-		urlEntity, err = s.Sr.Put(urlEntity)
-		body = urlEntity.ShortURL().ToString()
 	}
 
-	if err != nil {
-		return "", err
-	}
+	urlEntity := s.Sr.Put(url, shortURL)
 
-	return body, nil
+	return urlEntity.ShortURL().ToString(), nil
 }
 
+// Get Получить сокращённую ссылку по id
 func (s *Service) Get(url string) (*aggregate.URL, error) {
 	result, err := s.Sr.Get(url)
 

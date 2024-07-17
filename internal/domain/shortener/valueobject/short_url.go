@@ -21,6 +21,7 @@ func NewShortURL(baseURL BaseURL) ShortURL {
 	return ShortURL{baseURL, shortString}
 }
 
+// ToString Преобразовать в строку формата: url/shortURL
 func (su ShortURL) ToString() string {
 	return fmt.Sprintf("%s/%s", su.baseURL.ToString(), su.shortString)
 }

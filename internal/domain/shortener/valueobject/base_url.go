@@ -2,63 +2,66 @@ package valueobject
 
 import (
 	"fmt"
-	"strconv"
+	"net"
+	"net/url"
 	"strings"
 )
 
 type BaseURL struct {
 	scheme string
 	host   string
-	port   int
+	port   string
 }
 
 func NewBaseURL(host string) (BaseURL, error) {
-	scheme, hp, err := ParseBaseURL(host)
-	var port int
+	parsedURL, err := ParseBaseURL(host)
 
 	if err != nil {
 		return BaseURL{}, err
 	}
 
-	if len(hp) == 2 {
-		port, err = strconv.Atoi(hp[1])
-	}
-
-	if err != nil {
-		return BaseURL{}, err
-	}
-
-	return BaseURL{scheme, hp[0], port}, nil
+	return BaseURL{parsedURL["scheme"], parsedURL["host"], parsedURL["port"]}, nil
 }
 
+// ToString Преобразовать в строку формата: scheme://host:port
 func (bu BaseURL) ToString() string {
-	if bu.port == 0 {
-		return fmt.Sprintf("%s://%s", bu.scheme, bu.host)
-	}
-
-	return fmt.Sprintf("%s://%s:%d", bu.scheme, bu.host, bu.port)
+	return fmt.Sprintf("%s://%s:%s", bu.scheme, bu.host, bu.port)
 }
 
+// Host Получить хост
 func (bu BaseURL) Host() string {
 	return bu.host
 }
 
-func (bu BaseURL) Port() int {
+// Port Получить номер порт
+func (bu BaseURL) Port() string {
 	return bu.port
 }
 
-func ParseBaseURL(s string) (string, []string, error) {
-	host := strings.Split(s, "://")
-	var hp []string
-	var scheme string
+// ParseBaseURL Распарсить URL на схему, хост и порт
+func ParseBaseURL(s string) (map[string]string, error) {
+	parsedURL := make(map[string]string, 3)
+	schemeAndHost := strings.Split(s, "://")
 
-	if len(host) == 1 {
-		scheme = "http"
-		hp = strings.Split(host[0], ":")
-	} else {
-		scheme = host[0]
-		hp = strings.Split(host[1], ":")
+	if len(schemeAndHost) == 1 {
+		s = fmt.Sprintf("://%s", schemeAndHost[0])
 	}
 
-	return scheme, hp, nil
+	u, err := url.Parse(s)
+
+	if err != nil {
+		return parsedURL, err
+	}
+
+	host, port, err := net.SplitHostPort(u.Host)
+
+	if err != nil {
+		return parsedURL, err
+	}
+
+	parsedURL["scheme"] = u.Scheme
+	parsedURL["host"] = host
+	parsedURL["port"] = port
+
+	return parsedURL, nil
 }

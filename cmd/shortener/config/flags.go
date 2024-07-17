@@ -5,25 +5,35 @@ import (
 	"os"
 )
 
-var Args struct {
+type Args struct {
 	ServerAddress string
 	BaseURL       string
 }
 
-func ParseFlags() {
-	flag.StringVar(&Args.ServerAddress, "a", ":8080", "Server address host:port")
-	flag.StringVar(&Args.BaseURL, "b", "http://localhost:8080", "Result net address host:port")
-	flag.Parse()
-
-	setArgsFromEnv()
+func NewArgs() *Args {
+	return &Args{}
 }
 
-func setArgsFromEnv() {
+// Парсинг переменных из коман
+func (a *Args) ParseFlags() {
+	flag.StringVar(&a.ServerAddress, "a", ":8080", "Server address host:port")
+	flag.StringVar(&a.BaseURL, "b", "http://localhost:8080", "Result net address host:port")
+	flag.Parse()
+
+	a.setArgsFromEnv()
+}
+
+func (a *Args) setArgsFromEnv() {
 	if serverAddr := os.Getenv("SHORTENER_SERVER_ADDRESS"); serverAddr != "" {
-		Args.ServerAddress = serverAddr
+		a.ServerAddress = serverAddr
 	}
 
 	if baseURL := os.Getenv("SHORTENER_BASE_URL"); baseURL != "" {
-		Args.BaseURL = baseURL
+		a.BaseURL = baseURL
 	}
+}
+
+func (a *Args) SetArgs(serverAddress string, BaseURL string) {
+	a.ServerAddress = serverAddress
+	a.BaseURL = BaseURL
 }
