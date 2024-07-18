@@ -41,11 +41,9 @@ func (rm *RepositoryMemory) Put(originalURL string, shortURL valueobject.ShortUR
 
 func (rm *RepositoryMemory) CheckExistsOriginalURL(originalURL string) (*aggregate.URL, bool) {
 	for _, value := range rm.urls {
-
 		if value.OriginalURL() == originalURL {
 			return value, true
 		}
-
 	}
 
 	return nil, false

@@ -25,7 +25,7 @@ func NewService(baseURL string, repository Repository) *Service {
 	return s
 }
 
-// Put Сохранить url в хранилище
+// Put Сохранить url в хранилище. Возвращает сгенерированную короткую ссылку
 func (s *Service) Put(url string) (string, error) {
 	baseURL, err := valueobject.NewBaseURL(s.BaseURL)
 	if err != nil {

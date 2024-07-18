@@ -141,7 +141,7 @@ func TestGetByIDHandler(t *testing.T) {
 				res := responseForGet.Result()
 
 				if res.StatusCode != http.StatusTemporaryRedirect {
-					t.Errorf("excpected status 307; got %v", res.StatusCode)
+					t.Errorf("excpected status: got %v want %v", res.StatusCode, http.StatusTemporaryRedirect)
 				}
 
 				if location := res.Header.Get("Location"); location != tt.wantLocationHeader {

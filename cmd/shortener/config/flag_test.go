@@ -71,7 +71,7 @@ func TestFlagsWithError(t *testing.T) {
 			}
 
 			if res.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status %v; got %v", tt.wantStatusCode, res.StatusCode)
+				t.Errorf("excpected status: got %v want %v", res.StatusCode, tt.wantStatusCode)
 			}
 
 			defer func() {
