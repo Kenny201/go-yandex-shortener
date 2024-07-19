@@ -60,7 +60,7 @@ func TestPostHandler(t *testing.T) {
 			res := w.Result()
 
 			if res.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status %v; got %v", tt.wantStatusCode, res.StatusCode)
+				t.Errorf("excpected status %v; got %v", res.StatusCode, tt.wantStatusCode)
 			}
 
 			if ctype := res.Header.Get("Content-Type"); ctype != tt.wantResponseContentType {
@@ -88,6 +88,7 @@ func TestGetByIDHandler(t *testing.T) {
 	tests := []struct {
 		name               string
 		body               string
+		id                 string
 		wantLocationHeader string
 		wantStatusCode     int
 	}{
@@ -95,13 +96,19 @@ func TestGetByIDHandler(t *testing.T) {
 			name:               "redirect for body https://yandex.ru",
 			body:               "https://yandex.ru",
 			wantLocationHeader: "https://yandex.ru",
-			wantStatusCode:     http.StatusOK,
+			wantStatusCode:     http.StatusTemporaryRedirect,
 		},
 		{
 			name:               "redirect for body https://practicum.yandex.ru",
 			body:               "https://practicum.yandex.ru",
 			wantLocationHeader: "https://practicum.yandex.ru",
-			wantStatusCode:     http.StatusOK,
+			wantStatusCode:     http.StatusTemporaryRedirect,
+		},
+		{
+			name:           "id not found",
+			body:           "https://yandex.ru",
+			id:             "sdsds",
+			wantStatusCode: http.StatusNotFound,
 		},
 	}
 
@@ -130,7 +137,12 @@ func TestGetByIDHandler(t *testing.T) {
 
 				chiCtx := chi.NewRouteContext()
 				req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
-				chiCtx.URLParams.Add("id", v.ID())
+
+				if tt.id != "" {
+					chiCtx.URLParams.Add("id", tt.id)
+				} else {
+					chiCtx.URLParams.Add("id", v.ID())
+				}
 
 				if err != nil {
 					t.Fatalf("method not alowed: %v", err)
@@ -140,8 +152,8 @@ func TestGetByIDHandler(t *testing.T) {
 				handler.GetByIDHandler(responseForGet, req)
 				res := responseForGet.Result()
 
-				if res.StatusCode != http.StatusTemporaryRedirect {
-					t.Errorf("excpected status: got %v want %v", res.StatusCode, http.StatusTemporaryRedirect)
+				if res.StatusCode != tt.wantStatusCode {
+					t.Errorf("excpected status: got %v want %v", res.StatusCode, tt.wantStatusCode)
 				}
 
 				if location := res.Header.Get("Location"); location != tt.wantLocationHeader {
