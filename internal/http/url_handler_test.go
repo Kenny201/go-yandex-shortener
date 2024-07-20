@@ -6,7 +6,6 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 	"github.com/go-chi/chi/v5"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -67,8 +66,6 @@ func TestPostHandler(t *testing.T) {
 				t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
 					ctype, tt.wantResponseContentType)
 			}
-
-			_, err = io.ReadAll(res.Body)
 
 			defer func() {
 				err := res.Body.Close()
