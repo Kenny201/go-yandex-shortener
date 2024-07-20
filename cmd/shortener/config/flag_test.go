@@ -89,7 +89,6 @@ func TestFlags(t *testing.T) {
 		name           string
 		body           string
 		args           map[string]string
-		wantError      string
 		wantStatusCode int
 	}{
 		{
