@@ -1,28 +1,13 @@
-package http
+package handler
 
 import (
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/aggregate"
-	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
 )
 
-type ShortenerService interface {
-	Put(url string) (string, error)
-	Get(url string) (*aggregate.URL, error)
-}
-
-type ShortenerHandler struct {
-	shortenerService ShortenerService
-}
-
-func NewShortenerHandler(ss ShortenerService) ShortenerHandler {
-	return ShortenerHandler{
-		shortenerService: ss,
-	}
-}
-
-func (sh ShortenerHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
+func (sh Handler) GetWithTextData(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	url, err := sh.shortenerService.Get(id)
 
@@ -35,7 +20,7 @@ func (sh ShortenerHandler) GetByIDHandler(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (sh ShortenerHandler) PostHandler(w http.ResponseWriter, r *http.Request) {
+func (sh Handler) PostWithTextData(w http.ResponseWriter, r *http.Request) {
 	var shortURL string
 
 	body, err := io.ReadAll(r.Body)

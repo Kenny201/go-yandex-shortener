@@ -1,18 +1,19 @@
-package http
+package handler
 
 import (
 	"context"
-	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
-	"github.com/go-chi/chi/v5"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
+	"github.com/go-chi/chi/v5"
 )
 
-func TestPostHandler(t *testing.T) {
+func TestPostWithTextDataHandler(t *testing.T) {
 	tests := []struct {
 		name                    string
 		body                    string
@@ -54,7 +55,7 @@ func TestPostHandler(t *testing.T) {
 
 			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
 
-			NewShortenerHandler(ss).PostHandler(w, req)
+			New(ss).PostWithTextData(w, req)
 
 			res := w.Result()
 
@@ -81,7 +82,7 @@ func TestPostHandler(t *testing.T) {
 	}
 }
 
-func TestGetByIDHandler(t *testing.T) {
+func TestGetWithTextDataHandler(t *testing.T) {
 	tests := []struct {
 		name               string
 		body               string
@@ -124,8 +125,8 @@ func TestGetByIDHandler(t *testing.T) {
 
 			responseForPost := httptest.NewRecorder()
 			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
-			handler := NewShortenerHandler(ss)
-			handler.PostHandler(responseForPost, req)
+			handler := New(ss)
+			handler.PostWithTextData(responseForPost, req)
 
 			urlStorage := ss.Sr.GetAll()
 
@@ -146,7 +147,7 @@ func TestGetByIDHandler(t *testing.T) {
 				}
 
 				responseForGet := httptest.NewRecorder()
-				handler.GetByIDHandler(responseForGet, req)
+				handler.GetWithTextData(responseForGet, req)
 				res := responseForGet.Result()
 
 				if res.StatusCode != tt.wantStatusCode {

@@ -10,8 +10,14 @@ func (s *Server) useRoutes() *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middlewares.Logger)
 
-	r.Post("/", s.shortenerHandler.PostHandler)
-	r.Get("/{id}", s.shortenerHandler.GetByIDHandler)
+	r.Post("/", s.handler.PostWithTextData)
+	r.Get("/{id}", s.handler.GetWithTextData)
+
+	r.Route("/api", func(r chi.Router) {
+		r.Route("/shorten", func(r chi.Router) {
+			r.Post("/", s.handler.PostWithDataJSON)
+		})
+	})
 
 	return r
 }

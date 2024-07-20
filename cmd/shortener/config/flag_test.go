@@ -1,14 +1,15 @@
 package config
 
 import (
-	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	server "github.com/Kenny201/go-yandex-shortener.git/internal/http"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/http/handler"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
 func TestFlagsWithError(t *testing.T) {
@@ -56,7 +57,7 @@ func TestFlagsWithError(t *testing.T) {
 
 			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
 
-			server.NewShortenerHandler(ss).PostHandler(w, req)
+			handler.New(ss).PostWithTextData(w, req)
 
 			res := w.Result()
 			body, err := io.ReadAll(res.Body)
@@ -127,7 +128,7 @@ func TestFlags(t *testing.T) {
 
 			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
 
-			server.NewShortenerHandler(ss).PostHandler(w, req)
+			handler.New(ss).PostWithTextData(w, req)
 
 			res := w.Result()
 

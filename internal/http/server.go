@@ -2,17 +2,19 @@ package http
 
 import (
 	"net/http"
+
+	"github.com/Kenny201/go-yandex-shortener.git/internal/http/handler"
 )
 
 type Server struct {
-	shortenerHandler ShortenerHandler
-	serverAddress    string
+	handler       handler.Handler
+	serverAddress string
 }
 
-func NewServer(serverAddress string, handler ShortenerHandler) *Server {
+func NewServer(serverAddress string, handler handler.Handler) *Server {
 	return &Server{
-		shortenerHandler: handler,
-		serverAddress:    serverAddress,
+		handler:       handler,
+		serverAddress: serverAddress,
 	}
 }
 
