@@ -8,7 +8,10 @@ import (
 // Routes returns the initialized router
 func (s *Server) useRoutes() *chi.Mux {
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	r.Use(
+		middleware.Gzip,
+		middleware.Logger,
+	)
 
 	r.Post("/", s.handler.PostWithTextData)
 	r.Get("/{id}", s.handler.GetWithTextData)
