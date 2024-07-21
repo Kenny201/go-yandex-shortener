@@ -45,14 +45,8 @@ func TestPostWithTextDataHandler(t *testing.T) {
 			args := config.NewArgs()
 			args.SetArgs(":8080", "http://localhost:8080")
 
-			req, err := http.NewRequest(http.MethodPost, "http://localhost:8080/", strings.NewReader(tt.body))
-
-			if err != nil {
-				t.Fatalf("method not alowed: %v", err)
-			}
-
+			req := httptest.NewRequest(http.MethodPost, "http://localhost:8080/", strings.NewReader(tt.body))
 			w := httptest.NewRecorder()
-
 			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
 
 			New(ss).PostWithTextData(w, req)
@@ -74,10 +68,6 @@ func TestPostWithTextDataHandler(t *testing.T) {
 					t.Errorf("failed to close response body: %v", err)
 				}
 			}()
-
-			if err != nil {
-				t.Fatalf("could not read response:%v", err)
-			}
 		})
 	}
 }
@@ -117,21 +107,17 @@ func TestGetWithTextDataHandler(t *testing.T) {
 			args := config.NewArgs()
 			args.SetArgs(":8080", "http://localhost:8080")
 
-			req, err := http.NewRequest(http.MethodPost, "http://localhost:8080", strings.NewReader(tt.body))
-
-			if err != nil {
-				t.Fatalf("method not alowed: %v", err)
-			}
-
+			req := httptest.NewRequest(http.MethodPost, "http://localhost:8080", strings.NewReader(tt.body))
 			responseForPost := httptest.NewRecorder()
 			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
+
 			handler := New(ss)
 			handler.PostWithTextData(responseForPost, req)
 
 			urlStorage := ss.Sr.GetAll()
 
 			for _, v := range urlStorage {
-				req, err := http.NewRequest(http.MethodGet, "http://localhost:8080/", nil)
+				req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/", nil)
 
 				chiCtx := chi.NewRouteContext()
 				req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
@@ -140,10 +126,6 @@ func TestGetWithTextDataHandler(t *testing.T) {
 					chiCtx.URLParams.Add("id", tt.id)
 				} else {
 					chiCtx.URLParams.Add("id", v.ID())
-				}
-
-				if err != nil {
-					t.Fatalf("method not alowed: %v", err)
 				}
 
 				responseForGet := httptest.NewRecorder()
@@ -159,7 +141,7 @@ func TestGetWithTextDataHandler(t *testing.T) {
 						location, tt.wantLocationHeader)
 				}
 
-				err = res.Body.Close()
+				err := res.Body.Close()
 
 				if err != nil {
 					t.Errorf("failed to close response body: %v", err)

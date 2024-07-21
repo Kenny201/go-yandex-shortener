@@ -49,14 +49,8 @@ func TestPostWithDataJSONHandler(t *testing.T) {
 			args := config.NewArgs()
 			args.SetArgs(":8080", "http://localhost:8080")
 
-			req, err := http.NewRequest(http.MethodPost, "http://localhost:8080/api/shorten", strings.NewReader(tt.body))
-
-			if err != nil {
-				t.Fatalf("method not alowed: %v", err)
-			}
-
+			req := httptest.NewRequest(http.MethodPost, "http://localhost:8080/api/shorten", strings.NewReader(tt.body))
 			w := httptest.NewRecorder()
-
 			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
 
 			New(ss).PostWithDataJSON(w, req)
@@ -78,10 +72,6 @@ func TestPostWithDataJSONHandler(t *testing.T) {
 					t.Errorf("failed to close response body: %v", err)
 				}
 			}()
-
-			if err != nil {
-				t.Fatalf("could not read response:%v", err)
-			}
 		})
 	}
 }
