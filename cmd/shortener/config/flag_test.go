@@ -57,7 +57,7 @@ func TestFlagsWithError(t *testing.T) {
 
 			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
 
-			handler.New(ss).PostWithTextData(w, req)
+			handler.New(ss).Post(w, req)
 
 			res := w.Result()
 			body, err := io.ReadAll(res.Body)
@@ -128,7 +128,7 @@ func TestFlags(t *testing.T) {
 
 			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
 
-			handler.New(ss).PostWithTextData(w, req)
+			handler.New(ss).Post(w, req)
 
 			res := w.Result()
 
