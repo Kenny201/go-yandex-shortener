@@ -2,10 +2,11 @@ package handler
 
 import (
 	"encoding/json"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/http/respond"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/utils/message"
 	"io"
 	"net/http"
+
+	"github.com/Kenny201/go-yandex-shortener.git/internal/http/respond"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/utils/message"
 )
 
 type (
