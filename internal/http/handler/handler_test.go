@@ -160,13 +160,13 @@ func TestPostAPIHandler(t *testing.T) {
 	}{
 		{
 			name:                    "post json request for body https://yandex.ru",
-			body:                    "{\"url\": \"https://yandex.ru\"}",
+			body:                    `{"url": "https://yandex.ru"}`,
 			wantResponseContentType: "application/json",
 			wantStatusCode:          http.StatusCreated,
 		},
 		{
 			name:                    "post json request for body https://practicum.yandex.ru",
-			body:                    "{\"url\": \"https://practicum.yandex.ru\"}",
+			body:                    `{"url": "https://practicum.yandex.ru"}`,
 			wantResponseContentType: "application/json",
 			wantStatusCode:          http.StatusCreated,
 		},
