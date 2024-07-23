@@ -2,8 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/http/respond"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/utils/message"
 	"io"
 	"net/http"
 )
@@ -27,28 +25,28 @@ func (sh Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 
 	if err != nil {
-		respond.Error(w, http.StatusBadRequest, message.ErrBadRequest)
+		ErrorJSON(w, http.StatusBadRequest, NotReadRequestBody, err.Error())
 		return
 	}
 
 	if err = json.Unmarshal(body, &url); err != nil {
-		respond.Error(w, http.StatusBadRequest, message.ErrBadRequest)
+		ErrorJSON(w, http.StatusBadRequest, NotUnmarshall, err.Error())
 		return
 	}
 
 	if url.Url == "" {
-		respond.Error(w, http.StatusBadRequest, message.ErrEmptyURL)
+		ErrorJSON(w, http.StatusBadRequest, BadRequest, ErrUrlIsEmpty.Error())
 		return
 	}
 
 	shortURL, err = sh.shortenerService.Put(url.Url)
 
 	if err != nil {
-		respond.Error(w, http.StatusBadRequest, message.ErrBadRequest)
+		ErrorJSON(w, http.StatusBadRequest, BadRequest, err.Error())
 		return
 	}
 
-	respond.Json(w, http.StatusCreated, Response{
+	JSON(w, http.StatusCreated, Response{
 		Result: shortURL,
 	})
 }
