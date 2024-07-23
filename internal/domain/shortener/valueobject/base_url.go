@@ -1,10 +1,16 @@
 package valueobject
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
+)
+
+var (
+	ErrParseBaseURL  = errors.New("failed to parse base url")
+	ErrSplitHostPort = errors.New("failed to split host and port")
 )
 
 type BaseURL struct {
@@ -42,6 +48,7 @@ func (bu BaseURL) Port() string {
 func ParseBaseURL(s string) (map[string]string, error) {
 	parsedURL := make(map[string]string, 3)
 	schemeAndHost := strings.Split(s, "://")
+	var host, port string
 
 	if len(schemeAndHost) == 1 {
 		s = fmt.Sprintf("://%s", schemeAndHost[0])
@@ -50,13 +57,13 @@ func ParseBaseURL(s string) (map[string]string, error) {
 	u, err := url.Parse(s)
 
 	if err != nil {
-		return parsedURL, err
+		return parsedURL, ErrParseBaseURL
 	}
 
-	host, port, err := net.SplitHostPort(u.Host)
+	host, port, err = net.SplitHostPort(u.Host)
 
 	if err != nil {
-		return parsedURL, err
+		return parsedURL, ErrSplitHostPort
 	}
 
 	parsedURL["scheme"] = u.Scheme

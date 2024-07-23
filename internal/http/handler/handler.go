@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
@@ -8,7 +10,28 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+const (
+	NotReadRequestBody = "error reading request body"
+	NotUnmarshall      = "error unmarshall"
+	NotMarshall        = "error marshall"
+	RequestBodyIsEmpty = "request body is empty"
+	BadRequest         = "bad request"
+	UrlFieldIsEmpty    = "the url field cannot be empty"
+)
+
+var (
+	ErrUrlIsEmpty       = errors.New(UrlFieldIsEmpty)
+	ErrReadAll          = errors.New(NotReadRequestBody)
+	ErrRequestBodyEmpty = errors.New(RequestBodyIsEmpty)
+)
+
 type (
+	ErrorResponse struct {
+		Code   int    `json:"code"`
+		Error  string `json:"error"`
+		Detail string `json:"detail,omitempty"`
+	}
+
 	ShortenerService interface {
 		Put(url string) (string, error)
 		Get(url string) (*aggregate.URL, error)
@@ -44,12 +67,12 @@ func (sh Handler) Post(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, ErrReadAll.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if len(body) == 0 {
-		http.Error(w, "request body is empty", http.StatusBadRequest)
+		http.Error(w, ErrRequestBodyEmpty.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -63,4 +86,26 @@ func (sh Handler) Post(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
+}
+
+func ErrorJSON(w http.ResponseWriter, code int, error string, message string) {
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(ErrorResponse{Code: code, Error: error, Detail: message})
+}
+
+func JSON(w http.ResponseWriter, statusCode int, payload interface{}) {
+	w.WriteHeader(statusCode)
+
+	if payload == nil {
+		return
+	}
+
+	data, err := json.Marshal(payload)
+
+	if err != nil {
+		ErrorJSON(w, http.StatusBadRequest, NotMarshall, err.Error())
+		return
+	}
+
+	w.Write(data)
 }
