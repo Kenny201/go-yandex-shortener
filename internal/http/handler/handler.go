@@ -88,12 +88,12 @@ func (sh Handler) Post(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(shortURL))
 }
 
-func ErrorJSON(w http.ResponseWriter, code int, error string, message string) {
+func ErrorJSONResponse(w http.ResponseWriter, code int, error string, message string) {
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(ErrorResponse{Code: code, Error: error, Detail: message})
 }
 
-func JSON(w http.ResponseWriter, statusCode int, payload interface{}) {
+func JSONResponse(w http.ResponseWriter, statusCode int, payload interface{}) {
 	w.WriteHeader(statusCode)
 
 	if payload == nil {
@@ -103,7 +103,7 @@ func JSON(w http.ResponseWriter, statusCode int, payload interface{}) {
 	data, err := json.Marshal(payload)
 
 	if err != nil {
-		ErrorJSON(w, http.StatusBadRequest, NotMarshall, err.Error())
+		ErrorJSONResponse(w, http.StatusBadRequest, NotMarshall, err.Error())
 		return
 	}
 
