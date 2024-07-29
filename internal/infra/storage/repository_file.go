@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
 	"io"
 	"log/slog"
 	"os"
 	"path"
+
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
 )
 
 var (
@@ -25,6 +26,7 @@ type RepositoryFile struct {
 }
 
 func NewRepositoryFile(fileName string) *RepositoryFile {
+	// Удаляем первый слэш, чтобы был относительный путь
 	return &RepositoryFile{
 		fileName: fileName,
 		urls:     make(map[string]*entity.URL),
@@ -152,10 +154,11 @@ func (rf *RepositoryFile) checkExistsOriginalURL(originalURL string) (*entity.UR
 }
 
 func (rf *RepositoryFile) makeDir() error {
-	dir := path.Dir(rf.fileName)
+	folder := path.Dir(rf.fileName)
 
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err := os.MkdirAll(dir, 0755)
+	if _, err := os.Stat(folder); os.IsNotExist(err) {
+		err := os.MkdirAll(folder, 0755)
+
 		if err != nil {
 			return ErrCreateDir
 		}

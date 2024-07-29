@@ -19,7 +19,7 @@ func NewArgs() *Args {
 func (a *Args) ParseFlags() {
 	flag.StringVar(&a.ServerAddress, "a", ":8080", "Server address host:port")
 	flag.StringVar(&a.BaseURL, "b", "http://localhost:8080", "Result net address host:port")
-	flag.StringVar(&a.FileStoragePath, "f", "/tmp/index.txt", "File storage path")
+	flag.StringVar(&a.FileStoragePath, "f", "/tmp/Rquxc", "File storage path")
 	flag.Parse()
 
 	a.setArgsFromEnv()
@@ -35,7 +35,7 @@ func (a *Args) setArgsFromEnv() {
 		a.BaseURL = baseURL
 	}
 
-	if fileStoragePath := os.Getenv("SHORTENER_FILE_STORAGE_PATH"); fileStoragePath != "" {
+	if fileStoragePath := os.Getenv("FILE_STORAGE_PATH"); fileStoragePath != "" {
 		a.FileStoragePath = fileStoragePath
 	}
 }
