@@ -33,7 +33,7 @@ func (bu BaseURL) Host() string {
 	return bu.host
 }
 
-// Port Получить номер порт
+// Port Получить номер порта
 func (bu BaseURL) Port() string {
 	return bu.port
 }
