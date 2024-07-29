@@ -1,58 +1,58 @@
 package shortener
 
 import (
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/aggregate"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener/strategy"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
 )
 
 type Repository interface {
-	Get(id string) (*aggregate.URL, error)
-	GetAll() map[string]*aggregate.URL
-	Put(originalURL string, shortURL valueobject.ShortURL) *aggregate.URL
-	CheckExistsOriginalURL(originalURL string) (*aggregate.URL, bool)
+	Get(id string) (*entity.URL, error)
+	GetAll() map[string]*entity.URL
+	Put(originalURL string, baseURL valueobject.BaseURL) (string, error)
+	CheckExistsOriginalURL(originalURL string) (*entity.URL, bool)
 }
 
 type Service struct {
-	BaseURL string
-	Sr      Repository
+	strategy strategy.Strategy
 }
 
-func NewService(baseURL string, repository Repository) *Service {
+func NewService() *Service {
 	s := &Service{}
-	s.Sr = repository
-	s.BaseURL = baseURL
 
 	return s
 }
 
-// Put Сохранить url в хранилище. Возвращает сгенерированную короткую ссылку
-func (s *Service) Put(url string) (string, error) {
-	baseURL, err := valueobject.NewBaseURL(s.BaseURL)
+func (s *Service) SetStrategy(strategy strategy.Strategy) *Service {
+	s.strategy = strategy
 
-	if err != nil {
-		return "", err
-	}
-
-	shortURL := valueobject.NewShortURL(baseURL)
-
-	if len(s.Sr.GetAll()) != 0 {
-		if key, ok := s.Sr.CheckExistsOriginalURL(url); ok {
-			return key.ShortURL().ToString(), nil
-		}
-	}
-
-	urlEntity := s.Sr.Put(url, shortURL)
-
-	return urlEntity.ShortURL().ToString(), nil
+	return s
 }
 
-// Get Получить сокращённую ссылку по id
-func (s *Service) Get(url string) (*aggregate.URL, error) {
-	result, err := s.Sr.Get(url)
+// Get Получить сокращённую ссылку
+func (s *Service) Get(shortKey string) (*entity.URL, error) {
+	result, err := s.strategy.Get(shortKey)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return result, nil
+}
+
+// Put Сохранить url в хранилище.
+// Возвращает сокращённую ссылку
+func (s *Service) Put(originalURL string) (string, error) {
+	// Сохраняем ссылку в хранилище и получаем обратно
+	shortURL, err := s.strategy.Put(originalURL)
+
+	if err != nil {
+		return "", err
+	}
+
+	return shortURL, nil
+}
+
+func (s *Service) GetAll() (map[string]*entity.URL, error) {
+	return s.strategy.GetAll()
 }

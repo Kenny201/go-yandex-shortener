@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/aggregate"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -34,7 +34,7 @@ type (
 
 	ShortenerService interface {
 		Put(url string) (string, error)
-		Get(url string) (*aggregate.URL, error)
+		Get(url string) (*entity.URL, error)
 	}
 
 	Handler struct {
@@ -57,7 +57,7 @@ func (sh Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Location", url.OriginalURL())
+	w.Header().Set("Location", url.OriginalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 

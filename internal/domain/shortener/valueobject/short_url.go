@@ -11,27 +11,27 @@ const (
 )
 
 type ShortURL struct {
-	baseURL     BaseURL
-	shortString string
+	baseURL  BaseURL
+	shortKey string
 }
 
 func NewShortURL(baseURL BaseURL) ShortURL {
-	shortString := generateShortKey()
+	shortKey := generateShortKey()
 
-	return ShortURL{baseURL, shortString}
+	return ShortURL{baseURL, shortKey}
 }
 
-// ToString Преобразовать в строку формата: url/shortURL
+// ToString Преобразовать в строку формата: url/shortKey
 func (su ShortURL) ToString() string {
-	return fmt.Sprintf("%s/%s", su.baseURL.ToString(), su.shortString)
+	return fmt.Sprintf("%s/%s", su.baseURL.ToString(), su.shortKey)
 }
 
-// ShortString Получить сокрщённую ссылку
-func (su ShortURL) ShortString() string {
-	return su.shortString
+// ShortKey Получить сокращённую ссылку
+func (su ShortURL) ShortKey() string {
+	return su.shortKey
 }
 
-// Сгенерировать короткую ссылку
+// Сгенерировать ключ, который будет добавлен к сокращённой ссылке формата url/shortKey
 func generateShortKey() string {
 	b := make([]byte, lengthShortURL)
 
