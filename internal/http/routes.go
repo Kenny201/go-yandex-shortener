@@ -10,7 +10,6 @@ func (s *Server) useRoutes() *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(
-		middleware.JSON,
 		middleware.Logger,
 	)
 
