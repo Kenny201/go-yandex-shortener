@@ -173,13 +173,13 @@ func TestPostAPIHandler(t *testing.T) {
 		{
 			name:                    "post json request for empty body",
 			body:                    "",
-			wantResponseContentType: "application/problem+json",
+			wantResponseContentType: "application/json",
 			wantStatusCode:          http.StatusBadRequest,
 		},
 		{
 			name:                    "post request when body isn`t json type",
 			body:                    "https://practicum.yandex.ru",
-			wantResponseContentType: "application/problem+json",
+			wantResponseContentType: "application/json",
 			wantStatusCode:          http.StatusBadRequest,
 		},
 	}
