@@ -8,7 +8,7 @@ import (
 
 type (
 	Request struct {
-		Url string
+		URL string
 	}
 
 	Response struct {
@@ -19,7 +19,7 @@ type (
 func (sh Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 	var (
 		shortURL string
-		url      Request
+		request  Request
 	)
 
 	body, err := io.ReadAll(r.Body)
@@ -29,17 +29,17 @@ func (sh Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = json.Unmarshal(body, &url); err != nil {
+	if err = json.Unmarshal(body, &request); err != nil {
 		ErrorJSONResponse(w, http.StatusBadRequest, NotUnmarshall, err.Error())
 		return
 	}
 
-	if url.Url == "" {
-		ErrorJSONResponse(w, http.StatusBadRequest, BadRequest, ErrUrlIsEmpty.Error())
+	if request.URL == "" {
+		ErrorJSONResponse(w, http.StatusBadRequest, BadRequest, ErrURLIsEmpty.Error())
 		return
 	}
 
-	shortURL, err = sh.shortenerService.Put(url.Url)
+	shortURL, err = sh.shortenerService.Put(request.URL)
 
 	if err != nil {
 		ErrorJSONResponse(w, http.StatusBadRequest, BadRequest, err.Error())
