@@ -16,11 +16,11 @@ const (
 	NotMarshall        = "error marshall"
 	RequestBodyIsEmpty = "request body is empty"
 	BadRequest         = "bad request"
-	UrlFieldIsEmpty    = "the url field cannot be empty"
+	URLFieldIsEmpty    = "the url field cannot be empty"
 )
 
 var (
-	ErrUrlIsEmpty       = errors.New(UrlFieldIsEmpty)
+	ErrURLIsEmpty       = errors.New(URLFieldIsEmpty)
 	ErrReadAll          = errors.New(NotReadRequestBody)
 	ErrRequestBodyEmpty = errors.New(RequestBodyIsEmpty)
 )
