@@ -15,7 +15,7 @@ func NewArgs() *Args {
 	return &Args{}
 }
 
-// ParseFlags Парсинг переменных из коман
+// ParseFlags Парсинг переменных из командной строки
 func (a *Args) ParseFlags() {
 	flag.StringVar(&a.ServerAddress, "a", ":8080", "Server address host:port")
 	flag.StringVar(&a.BaseURL, "b", "http://localhost:8080", "Result net address host:port")

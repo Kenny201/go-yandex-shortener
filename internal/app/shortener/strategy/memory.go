@@ -6,13 +6,11 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
-// Memory defines an implementation of a Strategy to execute.
 type Memory struct {
 	baseURL          string
 	repositoryMemory *storage.RepositoryMemory
 }
 
-// NewMemory creates a new instance of strategy A.
 func NewMemory(baseURL string) Strategy {
 	return &Memory{
 		baseURL:          baseURL,
