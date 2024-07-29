@@ -2,14 +2,15 @@ package http
 
 import (
 	"context"
-	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
-	"github.com/go-chi/chi/v5"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
+	"github.com/go-chi/chi/v5"
 )
 
 func TestPostHandler(t *testing.T) {

@@ -1,10 +1,11 @@
 package http
 
 import (
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/aggregate"
-	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
+
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/aggregate"
+	"github.com/go-chi/chi/v5"
 )
 
 type ShortenerService interface {
