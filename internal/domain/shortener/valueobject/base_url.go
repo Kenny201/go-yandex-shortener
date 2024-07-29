@@ -39,7 +39,8 @@ func (bu BaseURL) Host() string {
 	return bu.host
 }
 
-// Port Получить номер порт
+
+// Port Получить номер порта
 func (bu BaseURL) Port() string {
 	return bu.port
 }
@@ -49,6 +50,7 @@ func ParseBaseURL(s string) (map[string]string, error) {
 	parsedURL := make(map[string]string, 3)
 	schemeAndHost := strings.Split(s, "://")
 	var host, port string
+
 
 	if len(schemeAndHost) == 1 {
 		s = fmt.Sprintf("://%s", schemeAndHost[0])

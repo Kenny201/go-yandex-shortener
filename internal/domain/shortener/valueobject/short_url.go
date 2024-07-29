@@ -26,7 +26,8 @@ func (su ShortURL) ToString() string {
 	return fmt.Sprintf("%s/%s", su.baseURL.ToString(), su.shortString)
 }
 
-// ShortString Получить сокрщённую ссылку
+
+// ShortString Получить сокращённую ссылку
 func (su ShortURL) ShortString() string {
 	return su.shortString
 }
