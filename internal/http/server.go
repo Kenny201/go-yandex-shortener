@@ -15,6 +15,7 @@ func NewServer(serverAddress string, handler handler.Handler) *Server {
 	return &Server{
 		handler:       handler,
 		serverAddress: serverAddress,
+
 	}
 }
 
