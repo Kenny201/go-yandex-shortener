@@ -17,6 +17,7 @@ func main() {
 	ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
 
 	urlHandler := handler.New(ss)
+
 	server := http.NewServer(args.ServerAddress, urlHandler)
 
 	log.Fatal(server.Start())
