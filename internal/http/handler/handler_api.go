@@ -19,7 +19,7 @@ type (
 func (sh Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 	var (
 		shortURL string
-		url      Request
+		URL      Request
 	)
 
 	body, err := io.ReadAll(r.Body)
@@ -29,17 +29,17 @@ func (sh Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err = json.Unmarshal(body, &url); err != nil {
+	if err = json.Unmarshal(body, &URL); err != nil {
 		ErrorJSONResponse(w, http.StatusBadRequest, NotUnmarshall, err.Error())
 		return
 	}
 
-	if url.Url == "" {
-		ErrorJSONResponse(w, http.StatusBadRequest, BadRequest, ErrUrlIsEmpty.Error())
+	if URL.Url == "" {
+		ErrorJSONResponse(w, http.StatusBadRequest, BadRequest, ErrURLIsEmpty.Error())
 		return
 	}
 
-	shortURL, err = sh.shortenerService.Put(url.Url)
+	shortURL, err = sh.shortenerService.Put(URL.Url)
 
 	if err != nil {
 		ErrorJSONResponse(w, http.StatusBadRequest, BadRequest, err.Error())
