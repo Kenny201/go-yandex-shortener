@@ -19,7 +19,7 @@ func NewArgs() *Args {
 func (a *Args) ParseFlags() {
 	flag.StringVar(&a.ServerAddress, "a", ":8080", "Server address host:port")
 	flag.StringVar(&a.BaseURL, "b", "http://localhost:8080", "Result net address host:port")
-	flag.StringVar(&a.FileStoragePath, "f", "index.txt", "File storage path")
+	flag.StringVar(&a.FileStoragePath, "f", "/tmp/index.txt", "File storage path")
 	flag.Parse()
 
 	a.setArgsFromEnv()

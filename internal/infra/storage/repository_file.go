@@ -4,18 +4,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
 	"io"
 	"log/slog"
 	"os"
-
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
+	"path"
 )
 
 var (
 	ErrOpenFile   = errors.New("failed open or create file")
 	ErrDecodeFile = errors.New("failed decode file")
 	ErrEncodeFile = errors.New("failed encode file")
+	ErrCreateDir  = errors.New("failed create or open directory")
 )
 
 type RepositoryFile struct {
@@ -47,6 +48,12 @@ func (rf *RepositoryFile) GetAll() (map[string]*entity.URL, error) {
 
 // Put Записать значение в файл
 func (rf *RepositoryFile) Put(originalURL string, baseURL valueobject.BaseURL) (string, error) {
+	err := rf.makeDir()
+
+	if err != nil {
+		return "", err
+	}
+
 	file, err := os.OpenFile(rf.fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 
 	if err != nil {
@@ -89,6 +96,12 @@ func (rf *RepositoryFile) Put(originalURL string, baseURL valueobject.BaseURL) (
 // Добавляет декодированные элементы в map[string]*entity.URL
 func (rf *RepositoryFile) ReadAll() error {
 	var url entity.URL
+
+	err := rf.makeDir()
+
+	if err != nil {
+		return err
+	}
 
 	file, err := os.OpenFile(rf.fileName, os.O_RDONLY|os.O_CREATE, 0666)
 
@@ -136,4 +149,17 @@ func (rf *RepositoryFile) checkExistsOriginalURL(originalURL string) (*entity.UR
 	}
 
 	return nil, false
+}
+
+func (rf *RepositoryFile) makeDir() error {
+	dir := path.Dir(rf.fileName)
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			return ErrCreateDir
+		}
+	}
+
+	return nil
 }
