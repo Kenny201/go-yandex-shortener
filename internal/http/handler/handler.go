@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -86,28 +85,4 @@ func (sh Handler) Post(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
-}
-
-func ErrorJSONResponse(w http.ResponseWriter, code int, error string, message string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(ErrorResponse{Code: code, Error: error, Detail: message})
-}
-
-func JSONResponse(w http.ResponseWriter, statusCode int, payload interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-
-	if payload == nil {
-		return
-	}
-
-	data, err := json.Marshal(payload)
-
-	if err != nil {
-		ErrorJSONResponse(w, http.StatusBadRequest, NotMarshall, err.Error())
-		return
-	}
-
-	w.Write(data)
 }
