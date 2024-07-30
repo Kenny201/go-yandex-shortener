@@ -7,5 +7,6 @@ import (
 type Strategy interface {
 	Put(originalURL string) (string, error)
 	Get(shortKey string) (*entity.URL, error)
-	GetAll() (map[string]*entity.URL, error)
+	GetAll() map[string]*entity.URL
+	checkExistsOriginalURL(originalURL string) (*entity.URL, bool)
 }

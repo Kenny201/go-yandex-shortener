@@ -3,19 +3,19 @@ package shortener
 import (
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener/strategy"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
 )
 
-type Repository interface {
-	Get(id string) (*entity.URL, error)
-	GetAll() map[string]*entity.URL
-	Put(originalURL string, baseURL valueobject.BaseURL) (string, error)
-	CheckExistsOriginalURL(originalURL string) (*entity.URL, bool)
-}
+type (
+	Repository interface {
+		Get(id string) (*entity.URL, error)
+		GetAll() map[string]*entity.URL
+		Put(url *entity.URL)
+	}
 
-type Service struct {
-	strategy strategy.Strategy
-}
+	Service struct {
+		strategy strategy.Strategy
+	}
+)
 
 func NewService() *Service {
 	s := &Service{}
@@ -53,6 +53,6 @@ func (s *Service) Put(originalURL string) (string, error) {
 	return shortURL, nil
 }
 
-func (s *Service) GetAll() (map[string]*entity.URL, error) {
+func (s *Service) GetAll() map[string]*entity.URL {
 	return s.strategy.GetAll()
 }

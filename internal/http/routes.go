@@ -1,8 +1,9 @@
 package http
 
 import (
-	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
 	"github.com/go-chi/chi/v5"
+
+	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
 )
 
 func (s *Server) useRoutes() *chi.Mux {

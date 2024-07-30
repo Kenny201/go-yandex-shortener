@@ -5,8 +5,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/go-chi/chi/v5"
+
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 )
 
 const (
@@ -25,12 +26,6 @@ var (
 )
 
 type (
-	ErrorResponse struct {
-		Code   int    `json:"code"`
-		Error  string `json:"error"`
-		Detail string `json:"detail,omitempty"`
-	}
-
 	ShortenerService interface {
 		Put(url string) (string, error)
 		Get(url string) (*entity.URL, error)

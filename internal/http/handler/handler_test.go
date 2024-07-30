@@ -7,10 +7,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener/strategy"
-	"github.com/go-chi/chi/v5"
 )
 
 func TestPostHandler(t *testing.T) {
@@ -120,7 +121,7 @@ func TestGetHandler(t *testing.T) {
 			handler := New(ss)
 			handler.Post(responseForPost, req)
 
-			urlStorage, _ := ss.GetAll()
+			urlStorage := ss.GetAll()
 
 			for _, v := range urlStorage {
 				req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/", nil)
