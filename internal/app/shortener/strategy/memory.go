@@ -7,20 +7,20 @@ import (
 )
 
 type Memory struct {
-	baseURL          string
-	repositoryMemory *storage.RepositoryMemory
+	baseURL    string
+	repository *storage.RepositoryMemory
 }
 
 func NewMemory(baseURL string) Strategy {
 	return &Memory{
-		baseURL:          baseURL,
-		repositoryMemory: storage.NewRepositoryMemory(),
+		baseURL:    baseURL,
+		repository: storage.NewRepositoryMemory(),
 	}
 }
 
-func (s *Memory) Get(url string) (*entity.URL, error) {
+func (memory *Memory) Get(url string) (*entity.URL, error) {
 	// Получить сокращённую ссылку из in-memory
-	result, err := s.repositoryMemory.Get(url)
+	result, err := memory.repository.Get(url)
 
 	if err != nil {
 		return nil, err
@@ -29,18 +29,18 @@ func (s *Memory) Get(url string) (*entity.URL, error) {
 	return result, nil
 }
 
-func (s *Memory) GetAll() (map[string]*entity.URL, error) {
-	return s.repositoryMemory.GetAll()
+func (memory *Memory) GetAll() (map[string]*entity.URL, error) {
+	return memory.repository.GetAll()
 }
 
-func (s *Memory) Put(originalURL string) (string, error) {
-	baseURL, err := valueobject.NewBaseURL(s.baseURL)
+func (memory *Memory) Put(originalURL string) (string, error) {
+	baseURL, err := valueobject.NewBaseURL(memory.baseURL)
 
 	if err != nil {
 		return "", err
 	}
 
 	// Сохраняем ссылку в хранилище in-memory и получаем обратно
-	shortURL, _ := s.repositoryMemory.Put(originalURL, baseURL)
+	shortURL, _ := memory.repository.Put(originalURL, baseURL)
 	return shortURL, nil
 }

@@ -7,41 +7,41 @@ import (
 )
 
 type File struct {
-	baseURL        string
-	repositoryFile *storage.RepositoryFile
+	baseURL    string
+	repository *storage.RepositoryFile
 }
 
 func NewFile(baseURL string, fileName string) Strategy {
-	f := &File{}
+	file := &File{}
 
-	f.repositoryFile = storage.NewRepositoryFile(fileName)
-	err := f.repositoryFile.ReadAll()
+	file.repository = storage.NewRepositoryFile(fileName)
+	err := file.repository.ReadAll()
 
 	if err != nil {
 		panic(err)
 	}
 
-	f.baseURL = baseURL
+	file.baseURL = baseURL
 
-	return f
+	return file
 }
 
-func (f *File) Get(shortKey string) (*entity.URL, error) {
-	return f.repositoryFile.Get(shortKey)
+func (file *File) Get(shortKey string) (*entity.URL, error) {
+	return file.repository.Get(shortKey)
 }
 
-func (f *File) GetAll() (map[string]*entity.URL, error) {
-	return f.repositoryFile.GetAll()
+func (file *File) GetAll() (map[string]*entity.URL, error) {
+	return file.repository.GetAll()
 }
 
-func (f *File) Put(originalURL string) (string, error) {
-	baseURL, err := valueobject.NewBaseURL(f.baseURL)
+func (file *File) Put(originalURL string) (string, error) {
+	baseURL, err := valueobject.NewBaseURL(file.baseURL)
 
 	if err != nil {
 		return "", err
 	}
 
 	// Сохраняем ссылку в хранилище и получаем обратно
-	shortURL, _ := f.repositoryFile.Put(originalURL, baseURL)
+	shortURL, _ := file.repository.Put(originalURL, baseURL)
 	return shortURL, nil
 }
