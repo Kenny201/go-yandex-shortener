@@ -126,9 +126,9 @@ func TestGetHandler(t *testing.T) {
 			req = httptest.NewRequest(http.MethodGet, URL, nil)
 
 			if tt.id != "" {
-				req = WithURLParam(req, "id", tt.id)
+				req = withURLParam(req, "id", tt.id)
 			} else {
-				req = WithURLParam(req, "id", shortKey)
+				req = withURLParam(req, "id", shortKey)
 			}
 
 			w := httptest.NewRecorder()
@@ -157,9 +157,9 @@ func TestGetHandler(t *testing.T) {
 			req = httptest.NewRequest(http.MethodGet, URL, nil)
 
 			if tt.id != "" {
-				req = WithURLParam(req, "id", tt.id)
+				req = withURLParam(req, "id", tt.id)
 			} else {
-				req = WithURLParam(req, "id", shortKey)
+				req = withURLParam(req, "id", shortKey)
 			}
 
 			w := httptest.NewRecorder()
@@ -271,7 +271,7 @@ func initService(strategy strategy.Strategy) *shortener.Service {
 	return ss
 }
 
-func WithURLParam(r *http.Request, key, value string) *http.Request {
+func withURLParam(r *http.Request, key, value string) *http.Request {
 	chiCtx := chi.NewRouteContext()
 	req := r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, chiCtx))
 	chiCtx.URLParams.Add(key, value)
