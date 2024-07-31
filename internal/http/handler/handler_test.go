@@ -2,8 +2,10 @@ package handler
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -12,6 +14,12 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener/strategy"
+)
+
+const (
+	serverAddress = ":8080"
+	baseURL       = "http://localhost:8080"
+	URL           = "http://localhost:8080"
 )
 
 func TestPostHandler(t *testing.T) {
@@ -42,36 +50,32 @@ func TestPostHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			args := config.NewArgs()
-			args.SetArgs(":8080", "http://localhost:8080", "urls.txt")
+		t.Run("test for memory strategy "+tt.name, func(t *testing.T) {
+			args := initArgs(serverAddress, baseURL, "")
+			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+			service := initService(strategy.NewMemory(args.BaseURL))
+			New(service).Post(rw, r)
 
-			req := httptest.NewRequest(http.MethodPost, "http://localhost:8080/", strings.NewReader(tt.body))
-			w := httptest.NewRecorder()
+			response := rw.Result()
 
-			strg := strategy.NewMemory(args.BaseURL)
-			ss := shortener.NewService()
-			ss.SetStrategy(strg)
+			assertCorrectStatusCode(t, response.StatusCode, tt.wantStatusCode)
+			assertCorrectContentType(t, response.Header.Get("Content-Type"), tt.wantResponseContentType)
 
-			New(ss).Post(w, req)
+			defer responseClose(t, response)
+		})
 
-			res := w.Result()
+		t.Run("test for file strategy "+tt.name, func(t *testing.T) {
+			args := initArgs(serverAddress, baseURL, "urls.txt")
+			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+			service := initService(strategy.NewFile(args.BaseURL, args.FileStoragePath))
+			New(service).Post(rw, r)
 
-			if res.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status %v; got %v", res.StatusCode, tt.wantStatusCode)
-			}
+			response := rw.Result()
 
-			if ctype := res.Header.Get("Content-Type"); ctype != tt.wantResponseContentType {
-				t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
-					ctype, tt.wantResponseContentType)
-			}
+			assertCorrectStatusCode(t, response.StatusCode, tt.wantStatusCode)
+			assertCorrectContentType(t, response.Header.Get("Content-Type"), tt.wantResponseContentType)
 
-			defer func() {
-				err := res.Body.Close()
-				if err != nil {
-					t.Errorf("failed to close response body: %v", err.Error())
-				}
-			}()
+			defer responseClose(t, response)
 		})
 	}
 }
@@ -105,113 +109,215 @@ func TestGetHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run("test for memory strategy "+tt.name, func(t *testing.T) {
+			args := initArgs(serverAddress, baseURL, "")
+			rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+			service := initService(strategy.NewMemory(args.BaseURL))
 
-			// Установка аргументов командной строки
-			args := config.NewArgs()
-			args.SetArgs(":8080", "http://localhost:8080", "urls.txt")
+			handler := New(service)
+			handler.Post(rw, req)
+			responsePost := rw.Result()
 
-			req := httptest.NewRequest(http.MethodPost, "http://localhost:8080", strings.NewReader(tt.body))
-			responseForPost := httptest.NewRecorder()
+			// Получает shortKey из строки сокращённого url
+			shortKey := getShortKeyFromShortedURL(t, responsePost.Body)
 
-			strg := strategy.NewMemory(args.BaseURL)
-			ss := shortener.NewService()
-			ss.SetStrategy(strg)
+			defer responseClose(t, responsePost)
 
-			handler := New(ss)
-			handler.Post(responseForPost, req)
+			req = httptest.NewRequest(http.MethodGet, URL, nil)
 
-			urlStorage := ss.GetAll()
-
-			for _, v := range urlStorage {
-				req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/", nil)
-
-				chiCtx := chi.NewRouteContext()
-				req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
-
-				if tt.id != "" {
-					chiCtx.URLParams.Add("id", tt.id)
-				} else {
-					chiCtx.URLParams.Add("id", v.ShortKey)
-				}
-
-				responseForGet := httptest.NewRecorder()
-				handler.Get(responseForGet, req)
-				res := responseForGet.Result()
-
-				if res.StatusCode != tt.wantStatusCode {
-					t.Errorf("excpected status: got %v want %v", res.StatusCode, tt.wantStatusCode)
-				}
-
-				if location := res.Header.Get("Location"); location != tt.wantLocationHeader {
-					t.Errorf("location header does not match: got %v want %v",
-						location, tt.wantLocationHeader)
-				}
-
-				err := res.Body.Close()
-
-				if err != nil {
-					t.Errorf("failed to close response body: %v", err.Error())
-				}
+			if tt.id != "" {
+				req = WithURLParam(req, "id", tt.id)
+			} else {
+				req = WithURLParam(req, "id", shortKey)
 			}
+
+			w := httptest.NewRecorder()
+			handler.Get(w, req)
+			responseGet := w.Result()
+
+			assertCorrectStatusCode(t, responseGet.StatusCode, tt.wantStatusCode)
+			assertCorrectHeaderLocation(t, responseGet.Header.Get("Location"), tt.wantLocationHeader)
+
+			defer responseClose(t, responseGet)
+		})
+
+		t.Run("test for file strategy "+tt.name, func(t *testing.T) {
+			args := initArgs(serverAddress, baseURL, "urls_get.txt")
+			rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+			service := initService(strategy.NewFile(args.BaseURL, args.FileStoragePath))
+
+			handler := New(service)
+			handler.Post(rw, req)
+			responsePost := rw.Result()
+			defer responseClose(t, responsePost)
+
+			// Получает shortKey из строки сокращённого url
+			shortKey := getShortKeyFromShortedURL(t, responsePost.Body)
+
+			req = httptest.NewRequest(http.MethodGet, URL, nil)
+
+			if tt.id != "" {
+				req = WithURLParam(req, "id", tt.id)
+			} else {
+				req = WithURLParam(req, "id", shortKey)
+			}
+
+			w := httptest.NewRecorder()
+			handler.Get(w, req)
+			response := w.Result()
+
+			assertCorrectStatusCode(t, response.StatusCode, tt.wantStatusCode)
+			assertCorrectHeaderLocation(t, response.Header.Get("Location"), tt.wantLocationHeader)
+
+			defer responseClose(t, response)
 		})
 	}
 }
 
 func TestPostAPIHandler(t *testing.T) {
 	tests := []struct {
-		name           string
-		body           string
-		wantStatusCode int
+		name                    string
+		body                    string
+		wantStatusCode          int
+		wantResponseContentType string
 	}{
 		{
-			name:           "post json request for body https://yandex.ru",
-			body:           `{"url": "https://yandex.ru"}`,
-			wantStatusCode: http.StatusCreated,
+			name:                    "post json request for body https://yandex.ru",
+			body:                    `{"url": "https://yandex.ru"}`,
+			wantStatusCode:          http.StatusCreated,
+			wantResponseContentType: "application/json",
 		},
 		{
-			name:           "post json request for body https://practicum.yandex.ru",
-			body:           `{"url": "https://practicum.yandex.ru"}`,
-			wantStatusCode: http.StatusCreated,
+			name:                    "post json request for body https://practicum.yandex.ru",
+			body:                    `{"url": "https://practicum.yandex.ru"}`,
+			wantStatusCode:          http.StatusCreated,
+			wantResponseContentType: "application/json",
 		},
 		{
-			name:           "post json request for empty body",
-			body:           "",
-			wantStatusCode: http.StatusBadRequest,
+			name:                    "post json request for empty body",
+			body:                    "",
+			wantStatusCode:          http.StatusBadRequest,
+			wantResponseContentType: "application/json",
 		},
 		{
-			name:           "post request when body isn`t json type",
-			body:           "https://practicum.yandex.ru",
-			wantStatusCode: http.StatusBadRequest,
+			name:                    "post request when body isn`t json type",
+			body:                    "https://practicum.yandex.ru",
+			wantStatusCode:          http.StatusBadRequest,
+			wantResponseContentType: "application/json",
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			args := config.NewArgs()
-			args.SetArgs(":8080", "http://localhost:8080", "urls.txt")
+		t.Run("test for memory strategy "+tt.name, func(t *testing.T) {
+			args := initArgs(serverAddress, baseURL, "")
+			rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 
-			req := httptest.NewRequest(http.MethodPost, "http://localhost:8080/api/shorten", strings.NewReader(tt.body))
-			w := httptest.NewRecorder()
+			strg := strategy.NewMemory(args.BaseURL)
+			ss := initService(strg)
+
+			New(ss).PostAPI(rw, req)
+
+			response := rw.Result()
+
+			assertCorrectStatusCode(t, response.StatusCode, tt.wantStatusCode)
+			assertCorrectContentType(t, response.Header.Get("Content-Type"), tt.wantResponseContentType)
+
+			defer responseClose(t, response)
+		})
+
+		t.Run("test for file strategy "+tt.name, func(t *testing.T) {
+			args := initArgs(serverAddress, baseURL, "urls_post_api.txt")
+			rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 
 			strg := strategy.NewFile(args.BaseURL, args.FileStoragePath)
-			ss := shortener.NewService()
-			ss.SetStrategy(strg)
+			ss := initService(strg)
 
-			New(ss).PostAPI(w, req)
+			New(ss).PostAPI(rw, req)
 
-			res := w.Result()
+			response := rw.Result()
 
-			if res.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status %v; got %v", res.StatusCode, tt.wantStatusCode)
-			}
+			assertCorrectStatusCode(t, response.StatusCode, tt.wantStatusCode)
+			assertCorrectContentType(t, response.Header.Get("Content-Type"), tt.wantResponseContentType)
 
-			defer func() {
-				err := res.Body.Close()
-				if err != nil {
-					t.Errorf("failed to close response body: %v", err)
-				}
-			}()
+			defer responseClose(t, response)
 		})
+	}
+}
+
+func initArgs(serverAddress, baseURL, filePath string) *config.Args {
+	args := config.NewArgs()
+	args.SetArgs(serverAddress, baseURL, filePath)
+
+	return args
+}
+
+func responseClose(t *testing.T, response *http.Response) {
+	t.Helper()
+	err := response.Body.Close()
+	if err != nil {
+		t.Errorf("failed to close response body: %v", err.Error())
+	}
+}
+
+func sendRequest(method, url string, body io.Reader) (*httptest.ResponseRecorder, *http.Request) {
+	req := httptest.NewRequest(method, url, body)
+	return httptest.NewRecorder(), req
+}
+
+func initService(strategy strategy.Strategy) *shortener.Service {
+	ss := shortener.NewService()
+	ss.SetStrategy(strategy)
+
+	return ss
+}
+
+func WithURLParam(r *http.Request, key, value string) *http.Request {
+	chiCtx := chi.NewRouteContext()
+	req := r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, chiCtx))
+	chiCtx.URLParams.Add(key, value)
+	return req
+}
+
+func getShortKeyFromShortedURL(t *testing.T, body io.ReadCloser) string {
+	t.Helper()
+	var host *url.URL
+
+	shortURL, err := io.ReadAll(body)
+
+	if err != nil {
+		t.Errorf("failed to read response body: %v", err.Error())
+	}
+
+	host, err = url.Parse(string(shortURL))
+
+	if err != nil {
+		t.Errorf("failed to parse url string: %v", err.Error())
+	}
+
+	shortKey := strings.TrimLeft(host.RequestURI(), "/")
+
+	return shortKey
+}
+
+func assertCorrectStatusCode(t *testing.T, got, want int) {
+	t.Helper()
+	if got != want {
+		t.Errorf("excpected status: got %v want %v", got, want)
+	}
+}
+
+func assertCorrectContentType(t *testing.T, got, want string) {
+	t.Helper()
+	if got != want {
+		t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
+			got, want)
+	}
+}
+
+func assertCorrectHeaderLocation(t *testing.T, got, want string) {
+	t.Helper()
+	if got != want {
+		t.Errorf("location header does not match: got %v want %v",
+			got, want)
 	}
 }
