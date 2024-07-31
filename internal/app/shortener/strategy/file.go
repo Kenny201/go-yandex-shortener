@@ -27,7 +27,7 @@ type File struct {
 	repository *storage.RepositoryMemory
 }
 
-func NewFile(baseURL string, filePath string) Strategy {
+func NewFile(baseURL, filePath string) Strategy {
 	file := &File{}
 	file.filePath = filePath
 	file.repository = storage.NewRepositoryMemory()

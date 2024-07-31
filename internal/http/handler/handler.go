@@ -11,17 +11,17 @@ import (
 )
 
 const (
-	NotReadRequestBody = "error reading request body"
-	NotUnmarshall      = "error unmarshall"
-	NotMarshall        = "error marshall"
-	RequestBodyIsEmpty = "request body is empty"
-	BadRequest         = "bad request"
-	URLFieldIsEmpty    = "the url field cannot be empty"
+	FailedReadRequestBody = "failed reading request body"
+	FailedUnmarshall      = "failed unmarshall"
+	FailedMarshall        = "failed marshall"
+	RequestBodyIsEmpty    = "request body is empty"
+	BadRequest            = "bad request"
+	URLFieldIsEmpty       = "the url field cannot be empty"
 )
 
 var (
 	ErrURLIsEmpty       = errors.New(URLFieldIsEmpty)
-	ErrReadAll          = errors.New(NotReadRequestBody)
+	ErrReadAll          = errors.New(FailedReadRequestBody)
 	ErrRequestBodyEmpty = errors.New(RequestBodyIsEmpty)
 )
 

@@ -212,8 +212,7 @@ func TestPostAPIHandler(t *testing.T) {
 			args := initArgs(serverAddress, baseURL, "")
 			rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 
-			strg := strategy.NewMemory(args.BaseURL)
-			ss := initService(strg)
+			ss := initService(strategy.NewMemory(args.BaseURL))
 
 			New(ss).PostAPI(rw, req)
 
@@ -229,8 +228,7 @@ func TestPostAPIHandler(t *testing.T) {
 			args := initArgs(serverAddress, baseURL, "urls_post_api.txt")
 			rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 
-			strg := strategy.NewFile(args.BaseURL, args.FileStoragePath)
-			ss := initService(strg)
+			ss := initService(strategy.NewFile(args.BaseURL, args.FileStoragePath))
 
 			New(ss).PostAPI(rw, req)
 

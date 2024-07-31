@@ -31,12 +31,12 @@ func (sh Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 
 	if err != nil {
-		ErrorJSONResponse(w, http.StatusBadRequest, NotReadRequestBody, err.Error())
+		ErrorJSONResponse(w, http.StatusBadRequest, FailedReadRequestBody, err.Error())
 		return
 	}
 
 	if err = json.Unmarshal(body, &request); err != nil {
-		ErrorJSONResponse(w, http.StatusBadRequest, NotUnmarshall, err.Error())
+		ErrorJSONResponse(w, http.StatusBadRequest, FailedUnmarshall, err.Error())
 		return
 	}
 
@@ -74,7 +74,7 @@ func JSONResponse(w http.ResponseWriter, statusCode int, payload interface{}) {
 	data, err := json.Marshal(payload)
 
 	if err != nil {
-		ErrorJSONResponse(w, http.StatusBadRequest, NotMarshall, err.Error())
+		ErrorJSONResponse(w, http.StatusBadRequest, FailedMarshall, err.Error())
 		return
 	}
 

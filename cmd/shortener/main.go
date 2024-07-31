@@ -14,8 +14,8 @@ func main() {
 	args := config.NewArgs()
 	args.ParseFlags()
 
-	strt := strategy.NewFile(args.BaseURL, args.FileStoragePath)
-	ss := shortener.NewService().SetStrategy(strt)
+	fileStrategy := strategy.NewFile(args.BaseURL, args.FileStoragePath)
+	ss := shortener.NewService().SetStrategy(fileStrategy)
 	urlHandler := handler.New(ss)
 
 	server := http.NewServer(args.ServerAddress, urlHandler)
