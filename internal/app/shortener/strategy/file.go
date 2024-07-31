@@ -71,17 +71,7 @@ func (file *File) Put(originalURL string) (string, error) {
 
 	encoder := json.NewEncoder(f)
 
-	defer func() {
-		err := f.Close()
-
-		if err != nil {
-			slog.Error(
-				"failed close file",
-				slog.String("fileName", file.filePath),
-				slog.String("error", err.Error()),
-			)
-		}
-	}()
+	defer file.close(f)
 
 	// Если запись существует повторную запись не производим
 	if value, ok := file.checkExistsOriginalURL(originalURL); ok {
@@ -119,17 +109,7 @@ func (file *File) ReadAll() error {
 		return fmt.Errorf("%w: %s", ErrOpenFile, err.Error())
 	}
 
-	defer func() {
-		err := f.Close()
-
-		if err != nil {
-			slog.Error(
-				"failed close file",
-				slog.String("fileName", file.filePath),
-				slog.String("error", err.Error()),
-			)
-		}
-	}()
+	defer file.close(f)
 
 	decoder := json.NewDecoder(f)
 
@@ -173,4 +153,16 @@ func (file *File) makeDir() error {
 	}
 
 	return nil
+}
+
+func (file *File) close(f *os.File) {
+	err := f.Close()
+
+	if err != nil {
+		slog.Error(
+			"failed close file",
+			slog.String("fileName", file.filePath),
+			slog.String("error", err.Error()),
+		)
+	}
 }
