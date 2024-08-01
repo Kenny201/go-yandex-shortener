@@ -6,17 +6,17 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 )
 
-type RepositoryMemory struct {
+type InMemoryShortenerRepository struct {
 	urls map[string]*entity.URL
 }
 
-func NewRepositoryMemory() *RepositoryMemory {
-	return &RepositoryMemory{
+func NewInMemoryShortenerRepository() *InMemoryShortenerRepository {
+	return &InMemoryShortenerRepository{
 		urls: make(map[string]*entity.URL),
 	}
 }
 
-func (rm *RepositoryMemory) Get(shortKey string) (*entity.URL, error) {
+func (rm *InMemoryShortenerRepository) Get(shortKey string) (*entity.URL, error) {
 	url, ok := rm.urls[shortKey]
 
 	if !ok {
@@ -27,11 +27,11 @@ func (rm *RepositoryMemory) Get(shortKey string) (*entity.URL, error) {
 	return url, nil
 }
 
-func (rm *RepositoryMemory) GetAll() map[string]*entity.URL {
+func (rm *InMemoryShortenerRepository) GetAll() map[string]*entity.URL {
 	return rm.urls
 }
 
 // Put Добавить новый элемент
-func (rm *RepositoryMemory) Put(urlEntity *entity.URL) {
+func (rm *InMemoryShortenerRepository) Put(urlEntity *entity.URL) {
 	rm.urls[urlEntity.ShortKey] = urlEntity
 }
