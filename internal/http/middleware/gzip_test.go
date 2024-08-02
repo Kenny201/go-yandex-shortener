@@ -48,6 +48,8 @@ func TestGzipCompression(t *testing.T) {
 			if got := resp.Header.Get("Content-Encoding"); got != tc.expectedEncoding {
 				t.Errorf("expected encoding %q but got %q", tc.expectedEncoding, got)
 			}
+
+			defer resp.Body.Close()
 		})
 	}
 }
