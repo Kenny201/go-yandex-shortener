@@ -1,14 +1,19 @@
 package config
 
 import (
-	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/http/handler"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener/strategy"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/http/handler"
+)
+
+const (
+	URL = "http://localhost:8080"
 )
 
 func TestFlagsWithError(t *testing.T) {
@@ -43,38 +48,22 @@ func TestFlagsWithError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := NewArgs()
-			args.SetArgs(tt.args["shortener_server_address"], tt.args["shortener_base_url"])
+			args := initArgs(tt.args["shortener_server_address"], tt.args["shortener_base_url"], "")
+			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+			service := initService(strategy.NewMemory(args.BaseURL))
+			handler.New(service).Post(rw, r)
 
-			req := httptest.NewRequest(http.MethodPost, tt.args["shortener_server_address"], strings.NewReader(tt.body))
-			w := httptest.NewRecorder()
-
-			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
-
-			handler.New(ss).Post(w, req)
-
-			res := w.Result()
+			res := rw.Result()
 			body, err := io.ReadAll(res.Body)
 
 			if err != nil {
 				t.Fatalf("could not read response:%v", err)
 			}
 
-			if error := string(body); error != tt.wantError {
-				t.Errorf("error handler not correct: got %v want %v",
-					error, tt.wantError)
-			}
+			assertCorrectError(t, string(body), tt.wantError)
+			assertCorrectStatusCode(t, res.StatusCode, tt.wantStatusCode)
 
-			if res.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status: got %v want %v", res.StatusCode, tt.wantStatusCode)
-			}
-
-			defer func() {
-				err := res.Body.Close()
-				if err != nil {
-					t.Errorf("failed to close response body: %v", err)
-				}
-			}()
+			defer responseClose(t, res)
 		})
 	}
 }
@@ -108,37 +97,61 @@ func TestFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := NewArgs()
-			args.SetArgs(tt.args["shortener_server_address"], tt.args["shortener_base_url"])
+			args := initArgs(tt.args["shortener_server_address"], tt.args["shortener_base_url"], "")
+			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+			service := initService(strategy.NewMemory(args.BaseURL))
+			handler.New(service).Post(rw, r)
 
-			req, err := http.NewRequest(http.MethodPost, tt.args["shortener_server_address"], strings.NewReader(tt.body))
-
-			if err != nil {
-				t.Fatalf("method not alowed: %v", err)
-			}
-
-			w := httptest.NewRecorder()
-
-			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
-
-			handler.New(ss).Post(w, req)
-
-			res := w.Result()
+			res := rw.Result()
+			_, err := io.ReadAll(res.Body)
 
 			if err != nil {
 				t.Fatalf("could not read response:%v", err)
 			}
 
-			if res.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status %v; got %v", tt.wantStatusCode, res.StatusCode)
-			}
-
-			defer func() {
-				err := res.Body.Close()
-				if err != nil {
-					t.Errorf("failed to close response body: %v", err)
-				}
-			}()
+			assertCorrectStatusCode(t, res.StatusCode, tt.wantStatusCode)
+			defer responseClose(t, res)
 		})
+	}
+}
+
+func initArgs(serverAddress, baseURL, filePath string) *Args {
+	args := NewArgs()
+	args.SetArgs(serverAddress, baseURL, filePath)
+
+	return args
+}
+
+func responseClose(t *testing.T, response *http.Response) {
+	t.Helper()
+	err := response.Body.Close()
+	if err != nil {
+		t.Errorf("failed to close response body: %v", err.Error())
+	}
+}
+
+func sendRequest(method, url string, body io.Reader) (*httptest.ResponseRecorder, *http.Request) {
+	req := httptest.NewRequest(method, url, body)
+	return httptest.NewRecorder(), req
+}
+
+func initService(strategy strategy.Strategy) *shortener.Service {
+	ss := shortener.NewService()
+	ss.SetStrategy(strategy)
+
+	return ss
+}
+
+func assertCorrectError(t *testing.T, got, want string) {
+	t.Helper()
+	if got != want {
+		t.Errorf("error handler not correct: got %v want %v", got, want)
+	}
+}
+
+func assertCorrectStatusCode(t *testing.T, got, want int) {
+	t.Helper()
+	if got != want {
+		t.Errorf("excpected status: got %v want %v", got, want)
 	}
 }
