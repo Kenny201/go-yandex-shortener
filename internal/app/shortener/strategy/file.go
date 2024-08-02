@@ -24,7 +24,7 @@ var (
 type File struct {
 	baseURL    string
 	filePath   string
-	repository *storage.MemoryShortenerRepository
+	repository Repository
 }
 
 func NewFile(baseURL, filePath string) Strategy {

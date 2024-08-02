@@ -10,7 +10,7 @@ import (
 
 type Memory struct {
 	baseURL    string
-	repository *storage.MemoryShortenerRepository
+	repository Repository
 }
 
 func NewMemory(baseURL string) Strategy {

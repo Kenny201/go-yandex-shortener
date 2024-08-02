@@ -5,17 +5,9 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 )
 
-type (
-	Repository interface {
-		Get(id string) (*entity.URL, error)
-		GetAll() map[string]*entity.URL
-		Put(url *entity.URL)
-	}
-
-	Service struct {
-		strategy strategy.Strategy
-	}
-)
+type Service struct {
+	strategy strategy.Strategy
+}
 
 func NewService() *Service {
 	s := &Service{}
