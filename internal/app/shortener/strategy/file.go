@@ -24,13 +24,13 @@ var (
 type File struct {
 	baseURL    string
 	filePath   string
-	repository *storage.InMemoryShortenerRepository
+	repository *storage.MemoryShortenerRepository
 }
 
 func NewFile(baseURL, filePath string) Strategy {
 	file := &File{}
 	file.filePath = filePath
-	file.repository = storage.NewInMemoryShortenerRepository()
+	file.repository = storage.NewMemoryShortenerRepository()
 	err := file.ReadAll()
 
 	if err != nil {
