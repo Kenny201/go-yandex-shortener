@@ -2,12 +2,13 @@ package middleware
 
 import (
 	"compress/gzip"
-	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
 )
 
 func TestGzipCompression(t *testing.T) {
@@ -83,16 +84,11 @@ func testRequestWithAcceptedEncodings(t *testing.T, ts *httptest.Server, method,
 
 func decodeResponseBody(t *testing.T, resp *http.Response) string {
 	var reader io.ReadCloser
+	var err error
 
-	switch resp.Header.Get("Content-Encoding") {
-	case "gzip":
-		var err error
-		reader, err = gzip.NewReader(resp.Body)
-		if err != nil {
-			t.Fatal(err)
-		}
-	default:
-		reader = resp.Body
+	reader, err = gzip.NewReader(resp.Body)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	respBody, err := io.ReadAll(reader)
