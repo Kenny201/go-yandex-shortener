@@ -57,12 +57,6 @@ func (file *File) Put(originalURL string) (string, error) {
 		return "", err
 	}
 
-	err = file.makeDir()
-
-	if err != nil {
-		return "", err
-	}
-
 	f, err := os.OpenFile(file.filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 
 	if err != nil {
