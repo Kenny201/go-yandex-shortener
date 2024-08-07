@@ -27,8 +27,8 @@ var (
 
 type (
 	ShortenerService interface {
-		Put(url string) (string, error)
-		Get(url string) (*entity.URL, error)
+		CreateShortURL(url string) (string, error)
+		GetShortURL(url string) (*entity.URL, error)
 	}
 
 	Handler struct {
@@ -44,7 +44,7 @@ func New(ss ShortenerService) Handler {
 
 func (sh Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	url, err := sh.shortenerService.Get(id)
+	url, err := sh.shortenerService.GetShortURL(id)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -70,7 +70,7 @@ func (sh Handler) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err = sh.shortenerService.Put(string(body))
+	shortURL, err = sh.shortenerService.CreateShortURL(string(body))
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

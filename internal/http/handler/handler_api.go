@@ -45,7 +45,7 @@ func (sh Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err = sh.shortenerService.Put(request.URL)
+	shortURL, err = sh.shortenerService.CreateShortURL(request.URL)
 
 	if err != nil {
 		ErrorJSONResponse(w, http.StatusBadRequest, BadRequest, err.Error())
