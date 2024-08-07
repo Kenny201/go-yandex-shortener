@@ -1,4 +1,4 @@
-package strategy
+package storage
 
 import (
 	"encoding/json"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
 var (
@@ -22,15 +21,15 @@ var (
 )
 
 type File struct {
-	baseURL    string
-	filePath   string
-	repository Repository
+	baseURL  string
+	filePath string
+	urls     map[string]*entity.URL
 }
 
-func NewFile(baseURL, filePath string) Strategy {
+func NewFile(baseURL, filePath string) *File {
 	file := &File{}
 	file.filePath = filePath
-	file.repository = storage.NewMemoryShortenerRepository()
+	file.urls = make(map[string]*entity.URL)
 	err := file.ReadAll()
 
 	if err != nil {
@@ -43,11 +42,18 @@ func NewFile(baseURL, filePath string) Strategy {
 }
 
 func (file *File) Get(shortKey string) (*entity.URL, error) {
-	return file.repository.Get(shortKey)
+	url, ok := file.urls[shortKey]
+
+	if !ok {
+		err := fmt.Errorf("url %v not found", shortKey)
+		return nil, err
+	}
+
+	return url, nil
 }
 
 func (file *File) GetAll() map[string]*entity.URL {
-	return file.repository.GetAll()
+	return file.urls
 }
 
 func (file *File) Put(originalURL string) (string, error) {
@@ -80,8 +86,8 @@ func (file *File) Put(originalURL string) (string, error) {
 		return "", fmt.Errorf("%w: %s", ErrEncodeFile, err.Error())
 	}
 
-	// Сохраняем ссылку в хранилище
-	file.repository.Put(urlEntity)
+	// Сохраняем ссылку в хранилище in-memory
+	file.urls[urlEntity.ShortKey] = urlEntity
 
 	return shortURL.ToString(), nil
 }
@@ -118,7 +124,7 @@ func (file *File) ReadAll() error {
 			return fmt.Errorf("%w: %s", ErrDecodeFile, err.Error())
 		}
 
-		file.repository.Put(url)
+		file.urls[url.ShortKey] = url
 	}
 
 	return nil

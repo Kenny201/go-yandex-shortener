@@ -1,29 +1,26 @@
 package shortener
 
 import (
-	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener/strategy"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 )
 
+type Repository interface {
+	Get(id string) (*entity.URL, error)
+	GetAll() map[string]*entity.URL
+	Put(originalURL string) (string, error)
+}
+
 type Service struct {
-	strategy strategy.Strategy
+	repository Repository
 }
 
-func NewService() *Service {
-	s := &Service{}
-
-	return s
-}
-
-func (s *Service) SetStrategy(strategy strategy.Strategy) *Service {
-	s.strategy = strategy
-
-	return s
+func NewService(repository Repository) *Service {
+	return &Service{repository: repository}
 }
 
 // Get Получить сокращённую ссылку
 func (s *Service) Get(shortKey string) (*entity.URL, error) {
-	result, err := s.strategy.Get(shortKey)
+	result, err := s.repository.Get(shortKey)
 
 	if err != nil {
 		return nil, err
@@ -36,7 +33,7 @@ func (s *Service) Get(shortKey string) (*entity.URL, error) {
 // Возвращает сокращённую ссылку
 func (s *Service) Put(originalURL string) (string, error) {
 	// Сохраняем ссылку в хранилище и получаем обратно
-	shortURL, err := s.strategy.Put(originalURL)
+	shortURL, err := s.repository.Put(originalURL)
 
 	if err != nil {
 		return "", err
@@ -46,5 +43,5 @@ func (s *Service) Put(originalURL string) (string, error) {
 }
 
 func (s *Service) GetAll() map[string]*entity.URL {
-	return s.strategy.GetAll()
+	return s.repository.GetAll()
 }

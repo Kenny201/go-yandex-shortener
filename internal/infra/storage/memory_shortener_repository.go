@@ -4,15 +4,18 @@ import (
 	"fmt"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
 )
 
 type MemoryShortenerRepository struct {
-	urls map[string]*entity.URL
+	baseURL string
+	urls    map[string]*entity.URL
 }
 
-func NewMemoryShortenerRepository() *MemoryShortenerRepository {
+func NewMemoryShortenerRepository(baseURL string) *MemoryShortenerRepository {
 	return &MemoryShortenerRepository{
-		urls: make(map[string]*entity.URL),
+		baseURL: baseURL,
+		urls:    make(map[string]*entity.URL),
 	}
 }
 
@@ -32,6 +35,34 @@ func (rm *MemoryShortenerRepository) GetAll() map[string]*entity.URL {
 }
 
 // Put Добавить новый элемент
-func (rm *MemoryShortenerRepository) Put(urlEntity *entity.URL) {
+func (rm *MemoryShortenerRepository) Put(originalURL string) (string, error) {
+	baseURL, err := valueobject.NewBaseURL(rm.baseURL)
+
+	if err != nil {
+		return "", err
+	}
+
+	//  Проверка существования записи в мапе urls.
+	if value, ok := rm.checkExistsOriginalURL(originalURL); ok {
+		return fmt.Sprintf("%s/%s", baseURL.ToString(), value.ShortKey), nil
+	}
+
+	shortURL := valueobject.NewShortURL(baseURL)
+	urlEntity := entity.NewURL(originalURL, shortURL.ShortKey())
+
+	// Сохраняем ссылку в хранилище in-memory
 	rm.urls[urlEntity.ShortKey] = urlEntity
+
+	return shortURL.ToString(), nil
+}
+
+// Проверка существования записи в мапе
+func (rm *MemoryShortenerRepository) checkExistsOriginalURL(originalURL string) (*entity.URL, bool) {
+	for _, value := range rm.GetAll() {
+		if value.OriginalURL == originalURL {
+			return value, true
+		}
+	}
+
+	return nil, false
 }
