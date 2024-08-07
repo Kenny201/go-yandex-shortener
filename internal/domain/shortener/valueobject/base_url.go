@@ -51,7 +51,6 @@ func ParseBaseURL(s string) (map[string]string, error) {
 	schemeAndHost := strings.Split(s, "://")
 	var host, port string
 
-
 	if len(schemeAndHost) == 1 {
 		s = fmt.Sprintf("://%s", schemeAndHost[0])
 	}
