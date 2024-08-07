@@ -25,6 +25,7 @@ func NewArgs() *Args {
 	return &Args{}
 }
 
+
 // ParseFlags Парсинг переменных из командной строки
 func (a *Args) ParseFlags() {
 	flag.StringVar(&a.ServerAddress, "a", defaultServerAddress, infoServerAddress)
