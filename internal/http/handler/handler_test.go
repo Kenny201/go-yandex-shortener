@@ -13,7 +13,7 @@ import (
 
 	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener/strategy"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
 const (
@@ -30,19 +30,19 @@ func TestPostHandler(t *testing.T) {
 		wantStatusCode          int
 	}{
 		{
-			name:                    "post request for body https://yandex.ru",
+			name:                    "post_request_for_body_https://yandex.ru",
 			body:                    "https://yandex.ru",
 			wantResponseContentType: "text/plain",
 			wantStatusCode:          http.StatusCreated,
 		},
 		{
-			name:                    "post request for body https://practicum.yandex.ru",
+			name:                    "post_request_for_body_https://practicum.yandex.ru",
 			body:                    "https://practicum.yandex.ru",
 			wantResponseContentType: "text/plain",
 			wantStatusCode:          http.StatusCreated,
 		},
 		{
-			name:                    "post request for empty body",
+			name:                    "post_request_for_empty_body",
 			body:                    "",
 			wantResponseContentType: "text/plain; charset=utf-8",
 			wantStatusCode:          http.StatusBadRequest,
@@ -50,32 +50,50 @@ func TestPostHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run("test for memory strategy "+tt.name, func(t *testing.T) {
+		t.Run("test_for_memory_strategy_"+tt.name, func(t *testing.T) {
 			args := initArgs(serverAddress, baseURL, "")
 			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
-			service := initService(strategy.NewMemory(args.BaseURL))
+			repository := storage.NewMemoryShortenerRepository(args.BaseURL)
+			service := shortener.NewService(repository)
 			New(service).Post(rw, r)
 
 			response := rw.Result()
-
-			assertCorrectStatusCode(t, response.StatusCode, tt.wantStatusCode)
-			assertCorrectContentType(t, response.Header.Get("Content-Type"), tt.wantResponseContentType)
-
 			defer responseClose(t, response)
+
+			if response.StatusCode != tt.wantStatusCode {
+				t.Errorf("excpected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
+			}
+
+			if response.Header.Get("Content-Type") != tt.wantResponseContentType {
+				t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
+					response.Header.Get("Content-Type"), tt.wantResponseContentType)
+			}
 		})
 
-		t.Run("test for file strategy "+tt.name, func(t *testing.T) {
+		t.Run("test_for_file_strategy_"+tt.name, func(t *testing.T) {
 			args := initArgs(serverAddress, baseURL, "urls.txt")
 			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
-			service := initService(strategy.NewFile(args.BaseURL, args.FileStoragePath))
+			repository, err := storage.NewFile(args.BaseURL, args.FileStoragePath)
+
+			if err != nil {
+				t.Errorf("failed create repository file error: %v", err.Error())
+			}
+
+			service := shortener.NewService(repository)
+
 			New(service).Post(rw, r)
 
 			response := rw.Result()
-
-			assertCorrectStatusCode(t, response.StatusCode, tt.wantStatusCode)
-			assertCorrectContentType(t, response.Header.Get("Content-Type"), tt.wantResponseContentType)
-
 			defer responseClose(t, response)
+
+			if response.StatusCode != tt.wantStatusCode {
+				t.Errorf("excpected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
+			}
+
+			if response.Header.Get("Content-Type") != tt.wantResponseContentType {
+				t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
+					response.Header.Get("Content-Type"), tt.wantResponseContentType)
+			}
 		})
 	}
 }
@@ -89,19 +107,19 @@ func TestGetHandler(t *testing.T) {
 		wantStatusCode     int
 	}{
 		{
-			name:               "redirect for body https://yandex.ru",
+			name:               "redirect_for_body_https://yandex.ru",
 			body:               "https://yandex.ru",
 			wantLocationHeader: "https://yandex.ru",
 			wantStatusCode:     http.StatusTemporaryRedirect,
 		},
 		{
-			name:               "redirect for body https://practicum.yandex.ru",
+			name:               "redirect_for_body_https://practicum.yandex.ru",
 			body:               "https://practicum.yandex.ru",
 			wantLocationHeader: "https://practicum.yandex.ru",
 			wantStatusCode:     http.StatusTemporaryRedirect,
 		},
 		{
-			name:           "id not found",
+			name:           "id_not_found",
 			body:           "https://yandex.ru",
 			id:             "sdsds",
 			wantStatusCode: http.StatusNotFound,
@@ -109,19 +127,20 @@ func TestGetHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run("test for memory strategy "+tt.name, func(t *testing.T) {
+		t.Run("test_for_memory_strategy_"+tt.name, func(t *testing.T) {
 			args := initArgs(serverAddress, baseURL, "")
 			rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
-			service := initService(strategy.NewMemory(args.BaseURL))
+
+			repository := storage.NewMemoryShortenerRepository(args.BaseURL)
+			service := shortener.NewService(repository)
 
 			handler := New(service)
 			handler.Post(rw, req)
 			responsePost := rw.Result()
+			defer responseClose(t, responsePost)
 
 			// Получает shortKey из строки сокращённого url
 			shortKey := getShortKeyFromShortedURL(t, responsePost.Body)
-
-			defer responseClose(t, responsePost)
 
 			req = httptest.NewRequest(http.MethodGet, URL, nil)
 
@@ -134,17 +153,29 @@ func TestGetHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 			handler.Get(w, req)
 			responseGet := w.Result()
-
-			assertCorrectStatusCode(t, responseGet.StatusCode, tt.wantStatusCode)
-			assertCorrectHeaderLocation(t, responseGet.Header.Get("Location"), tt.wantLocationHeader)
-
 			defer responseClose(t, responseGet)
+
+			if responseGet.StatusCode != tt.wantStatusCode {
+				t.Errorf("excpected status: got %v want %v", responseGet.StatusCode, tt.wantStatusCode)
+			}
+
+			if responseGet.Header.Get("Location") != tt.wantLocationHeader {
+				t.Errorf("location header does not match: got %v want %v",
+					responseGet.Header.Get("Location"), tt.wantLocationHeader)
+			}
 		})
 
-		t.Run("test for file strategy "+tt.name, func(t *testing.T) {
+		t.Run("test_for_file strategy_"+tt.name, func(t *testing.T) {
 			args := initArgs(serverAddress, baseURL, "urls_get.txt")
 			rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
-			service := initService(strategy.NewFile(args.BaseURL, args.FileStoragePath))
+
+			repository, err := storage.NewFile(args.BaseURL, args.FileStoragePath)
+
+			if err != nil {
+				t.Errorf("failed create repository file error: %v", err.Error())
+			}
+
+			service := shortener.NewService(repository)
 
 			handler := New(service)
 			handler.Post(rw, req)
@@ -165,11 +196,16 @@ func TestGetHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 			handler.Get(w, req)
 			response := w.Result()
-
-			assertCorrectStatusCode(t, response.StatusCode, tt.wantStatusCode)
-			assertCorrectHeaderLocation(t, response.Header.Get("Location"), tt.wantLocationHeader)
-
 			defer responseClose(t, response)
+
+			if response.StatusCode != tt.wantStatusCode {
+				t.Errorf("excpected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
+			}
+
+			if response.Header.Get("Location") != tt.wantLocationHeader {
+				t.Errorf("location header does not match: got %v want %v",
+					response.Header.Get("Location"), tt.wantLocationHeader)
+			}
 		})
 	}
 }
@@ -208,36 +244,53 @@ func TestPostAPIHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run("test for memory strategy "+tt.name, func(t *testing.T) {
+		t.Run("test_for_memory_strategy_"+tt.name, func(t *testing.T) {
 			args := initArgs(serverAddress, baseURL, "")
 			rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 
-			ss := initService(strategy.NewMemory(args.BaseURL))
+			repository := storage.NewMemoryShortenerRepository(args.BaseURL)
+			ss := shortener.NewService(repository)
 
 			New(ss).PostAPI(rw, req)
 
 			response := rw.Result()
-
-			assertCorrectStatusCode(t, response.StatusCode, tt.wantStatusCode)
-			assertCorrectContentType(t, response.Header.Get("Content-Type"), tt.wantResponseContentType)
-
 			defer responseClose(t, response)
+
+			if response.StatusCode != tt.wantStatusCode {
+				t.Errorf("excpected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
+			}
+
+			if response.Header.Get("Content-Type") != tt.wantResponseContentType {
+				t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
+					response.Header.Get("Content-Type"), tt.wantResponseContentType)
+			}
 		})
 
 		t.Run("test for file strategy "+tt.name, func(t *testing.T) {
 			args := initArgs(serverAddress, baseURL, "urls_post_api.txt")
 			rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 
-			ss := initService(strategy.NewFile(args.BaseURL, args.FileStoragePath))
+			repository, err := storage.NewFile(args.BaseURL, args.FileStoragePath)
+
+			if err != nil {
+				t.Errorf("failed create repository file error:%v", err.Error())
+			}
+
+			ss := shortener.NewService(repository)
 
 			New(ss).PostAPI(rw, req)
 
 			response := rw.Result()
-
-			assertCorrectStatusCode(t, response.StatusCode, tt.wantStatusCode)
-			assertCorrectContentType(t, response.Header.Get("Content-Type"), tt.wantResponseContentType)
-
 			defer responseClose(t, response)
+
+			if response.StatusCode != tt.wantStatusCode {
+				t.Errorf("excpected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
+			}
+
+			if response.Header.Get("Content-Type") != tt.wantResponseContentType {
+				t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
+					response.Header.Get("Content-Type"), tt.wantResponseContentType)
+			}
 		})
 	}
 }
@@ -260,13 +313,6 @@ func responseClose(t *testing.T, response *http.Response) {
 func sendRequest(method, url string, body io.Reader) (*httptest.ResponseRecorder, *http.Request) {
 	req := httptest.NewRequest(method, url, body)
 	return httptest.NewRecorder(), req
-}
-
-func initService(strategy strategy.Strategy) *shortener.Service {
-	ss := shortener.NewService()
-	ss.SetStrategy(strategy)
-
-	return ss
 }
 
 func withURLParam(r *http.Request, key, value string) *http.Request {
@@ -295,27 +341,4 @@ func getShortKeyFromShortedURL(t *testing.T, body io.ReadCloser) string {
 	shortKey := strings.TrimLeft(host.RequestURI(), "/")
 
 	return shortKey
-}
-
-func assertCorrectStatusCode(t *testing.T, got, want int) {
-	t.Helper()
-	if got != want {
-		t.Errorf("excpected status: got %v want %v", got, want)
-	}
-}
-
-func assertCorrectContentType(t *testing.T, got, want string) {
-	t.Helper()
-	if got != want {
-		t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
-			got, want)
-	}
-}
-
-func assertCorrectHeaderLocation(t *testing.T, got, want string) {
-	t.Helper()
-	if got != want {
-		t.Errorf("location header does not match: got %v want %v",
-			got, want)
-	}
 }

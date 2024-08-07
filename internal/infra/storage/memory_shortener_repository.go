@@ -58,6 +58,7 @@ func (rm *MemoryShortenerRepository) Put(originalURL string) (string, error) {
 
 // Проверка существования записи в мапе
 func (rm *MemoryShortenerRepository) checkExistsOriginalURL(originalURL string) (*entity.URL, bool) {
+
 	for _, value := range rm.GetAll() {
 		if value.OriginalURL == originalURL {
 			return value, true

@@ -18,9 +18,7 @@ func (s *Server) useRoutes() *chi.Mux {
 	r.Get("/{id}", s.handler.Get)
 
 	r.Route("/api", func(r chi.Router) {
-		r.Route("/shorten", func(r chi.Router) {
-			r.Post("/", s.handler.PostAPI)
-		})
+		r.Post("/shorten", s.handler.PostAPI)
 	})
 
 	return r

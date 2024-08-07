@@ -26,19 +26,20 @@ type File struct {
 	urls     map[string]*entity.URL
 }
 
-func NewFile(baseURL, filePath string) *File {
-	file := &File{}
-	file.filePath = filePath
-	file.urls = make(map[string]*entity.URL)
+func NewFile(baseURL, filePath string) (*File, error) {
+	file := &File{
+		filePath: filePath,
+		urls:     make(map[string]*entity.URL),
+		baseURL:  baseURL,
+	}
+
 	err := file.ReadAll()
 
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	file.baseURL = baseURL
-
-	return file
+	return file, nil
 }
 
 func (file *File) Get(shortKey string) (*entity.URL, error) {
@@ -69,9 +70,9 @@ func (file *File) Put(originalURL string) (string, error) {
 		return "", fmt.Errorf("%w: %v", ErrOpenFile, err.Error())
 	}
 
-	encoder := json.NewEncoder(f)
-
 	defer file.close(f)
+
+	encoder := json.NewEncoder(f)
 
 	// Если запись существует повторную запись не производим
 	if value, ok := file.checkExistsOriginalURL(originalURL); ok {
