@@ -11,15 +11,12 @@ import (
 )
 
 func main() {
-	var err error
-	var repository shortener.Repository
-
 	args := config.NewArgs()
 	args.ParseFlags()
 
-	repository, err = storage.NewFile(args.BaseURL, args.FileStoragePath)
-	ss := shortener.NewService(repository)
-	urlHandler := handler.New(ss)
+	repository, err := storage.NewFileShortenerRepository(args.BaseURL, args.FileStoragePath)
+	linkShortener := shortener.New(repository)
+	urlHandler := handler.New(linkShortener)
 
 	server := http.NewServer(args.ServerAddress, urlHandler)
 	err = server.Start()

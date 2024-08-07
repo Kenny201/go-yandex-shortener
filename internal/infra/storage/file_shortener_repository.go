@@ -20,14 +20,14 @@ var (
 	ErrCreateDir  = errors.New("failed create or open directory")
 )
 
-type File struct {
+type FileShortenerRepository struct {
 	baseURL  string
 	filePath string
 	urls     map[string]*entity.URL
 }
 
-func NewFile(baseURL, filePath string) (*File, error) {
-	file := &File{
+func NewFileShortenerRepository(baseURL, filePath string) (*FileShortenerRepository, error) {
+	file := &FileShortenerRepository{
 		filePath: filePath,
 		urls:     make(map[string]*entity.URL),
 		baseURL:  baseURL,
@@ -42,7 +42,7 @@ func NewFile(baseURL, filePath string) (*File, error) {
 	return file, nil
 }
 
-func (file *File) Get(shortKey string) (*entity.URL, error) {
+func (file *FileShortenerRepository) Get(shortKey string) (*entity.URL, error) {
 	url, ok := file.urls[shortKey]
 
 	if !ok {
@@ -53,11 +53,11 @@ func (file *File) Get(shortKey string) (*entity.URL, error) {
 	return url, nil
 }
 
-func (file *File) GetAll() map[string]*entity.URL {
+func (file *FileShortenerRepository) GetAll() map[string]*entity.URL {
 	return file.urls
 }
 
-func (file *File) Put(originalURL string) (string, error) {
+func (file *FileShortenerRepository) Put(originalURL string) (string, error) {
 	baseURL, err := valueobject.NewBaseURL(file.baseURL)
 
 	if err != nil {
@@ -95,7 +95,7 @@ func (file *File) Put(originalURL string) (string, error) {
 
 // ReadAll Прочитать строки из файла и декодировать в entity.URL
 // Добавляет декодированные элементы в repositoryMemory
-func (file *File) ReadAll() error {
+func (file *FileShortenerRepository) ReadAll() error {
 	var url *entity.URL
 
 	err := file.makeDir()
@@ -132,7 +132,7 @@ func (file *File) ReadAll() error {
 }
 
 // Проверка существования записи в файле
-func (file *File) checkExistsOriginalURL(originalURL string) (*entity.URL, bool) {
+func (file *FileShortenerRepository) checkExistsOriginalURL(originalURL string) (*entity.URL, bool) {
 	for _, value := range file.GetAll() {
 		if value.OriginalURL == originalURL {
 			return value, true
@@ -142,7 +142,7 @@ func (file *File) checkExistsOriginalURL(originalURL string) (*entity.URL, bool)
 	return nil, false
 }
 
-func (file *File) makeDir() error {
+func (file *FileShortenerRepository) makeDir() error {
 	folder := path.Dir(file.filePath)
 
 	if _, err := os.Stat(folder); os.IsNotExist(err) {
@@ -156,7 +156,7 @@ func (file *File) makeDir() error {
 	return nil
 }
 
-func (file *File) close(f *os.File) {
+func (file *FileShortenerRepository) close(f *os.File) {
 	err := f.Close()
 
 	if err != nil {

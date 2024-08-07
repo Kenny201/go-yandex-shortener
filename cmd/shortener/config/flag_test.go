@@ -52,9 +52,9 @@ func TestFlagsWithError(t *testing.T) {
 			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 
 			repository := storage.NewMemoryShortenerRepository(args.BaseURL)
-			service := shortener.NewService(repository)
+			linkShortener := shortener.New(repository)
 
-			handler.New(service).Post(rw, r)
+			handler.New(linkShortener).Post(rw, r)
 
 			res := rw.Result()
 			defer responseClose(t, res)
@@ -109,7 +109,7 @@ func TestFlags(t *testing.T) {
 			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 
 			repository := storage.NewMemoryShortenerRepository(args.BaseURL)
-			service := shortener.NewService(repository)
+			service := shortener.New(repository)
 
 			handler.New(service).Post(rw, r)
 

@@ -10,16 +10,16 @@ type Repository interface {
 	Put(originalURL string) (string, error)
 }
 
-type Service struct {
+type Shortener struct {
 	repository Repository
 }
 
-func NewService(repository Repository) *Service {
-	return &Service{repository: repository}
+func New(repository Repository) *Shortener {
+	return &Shortener{repository: repository}
 }
 
 // Get Получить сокращённую ссылку
-func (s *Service) Get(shortKey string) (*entity.URL, error) {
+func (s *Shortener) Get(shortKey string) (*entity.URL, error) {
 	result, err := s.repository.Get(shortKey)
 
 	if err != nil {
@@ -31,7 +31,7 @@ func (s *Service) Get(shortKey string) (*entity.URL, error) {
 
 // Put Сохранить url в хранилище.
 // Возвращает сокращённую ссылку
-func (s *Service) Put(originalURL string) (string, error) {
+func (s *Shortener) Put(originalURL string) (string, error) {
 	// Сохраняем ссылку в хранилище и получаем обратно
 	shortURL, err := s.repository.Put(originalURL)
 
@@ -42,6 +42,6 @@ func (s *Service) Put(originalURL string) (string, error) {
 	return shortURL, nil
 }
 
-func (s *Service) GetAll() map[string]*entity.URL {
+func (s *Shortener) GetAll() map[string]*entity.URL {
 	return s.repository.GetAll()
 }
