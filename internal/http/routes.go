@@ -8,10 +8,19 @@ import (
 // Routes returns the initialized router
 func (s *Server) useRoutes() *chi.Mux {
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
 
-	r.Post("/", s.shortenerHandler.PostHandler)
-	r.Get("/{id}", s.shortenerHandler.GetByIDHandler)
+	r.Use(
+		middleware.Logger,
+	)
+
+	r.Post("/", s.handler.Post)
+	r.Get("/{id}", s.handler.Get)
+
+	r.Route("/api", func(r chi.Router) {
+		r.Route("/shorten", func(r chi.Router) {
+			r.Post("/", s.handler.PostAPI)
+		})
+	})
 
 	return r
 }

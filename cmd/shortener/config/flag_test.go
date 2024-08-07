@@ -2,7 +2,7 @@ package config
 
 import (
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	server "github.com/Kenny201/go-yandex-shortener.git/internal/http"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/http/handler"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 	"io"
 	"net/http"
@@ -26,7 +26,7 @@ func TestFlagsWithError(t *testing.T) {
 				"shortener_server_address": "http://localhost:8080",
 				"shortener_base_url":       "://localhost:8080",
 			},
-			wantError:      "parse \"://localhost:8080\": missing protocol scheme\n",
+			wantError:      "failed to parse base url\n",
 			wantStatusCode: http.StatusBadRequest,
 		},
 		{
@@ -36,7 +36,7 @@ func TestFlagsWithError(t *testing.T) {
 				"shortener_server_address": "http://localhost:8080",
 				"shortener_base_url":       "http://localhost",
 			},
-			wantError:      "address localhost: missing port in address\n",
+			wantError:      "failed to split host and port\n",
 			wantStatusCode: http.StatusBadRequest,
 		},
 	}
@@ -46,17 +46,12 @@ func TestFlagsWithError(t *testing.T) {
 			args := NewArgs()
 			args.SetArgs(tt.args["shortener_server_address"], tt.args["shortener_base_url"])
 
-			req, err := http.NewRequest(http.MethodPost, tt.args["shortener_server_address"], strings.NewReader(tt.body))
-
-			if err != nil {
-				t.Fatalf("method not alowed: %v", err)
-			}
-
+			req := httptest.NewRequest(http.MethodPost, tt.args["shortener_server_address"], strings.NewReader(tt.body))
 			w := httptest.NewRecorder()
 
 			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
 
-			server.NewShortenerHandler(ss).PostHandler(w, req)
+			handler.New(ss).Post(w, req)
 
 			res := w.Result()
 			body, err := io.ReadAll(res.Body)
@@ -126,7 +121,7 @@ func TestFlags(t *testing.T) {
 
 			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
 
-			server.NewShortenerHandler(ss).PostHandler(w, req)
+			handler.New(ss).Post(w, req)
 
 			res := w.Result()
 
