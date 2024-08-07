@@ -34,8 +34,8 @@ func (rm *MemoryShortenerRepository) GetAll() map[string]*entity.URL {
 	return rm.urls
 }
 
-// Put Добавить новый элемент
-func (rm *MemoryShortenerRepository) Put(originalURL string) (string, error) {
+// Create Добавить новый элемент
+func (rm *MemoryShortenerRepository) Create(originalURL string) (string, error) {
 	baseURL, err := valueobject.NewBaseURL(rm.baseURL)
 
 	if err != nil {

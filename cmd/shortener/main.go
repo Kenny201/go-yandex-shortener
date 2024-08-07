@@ -23,9 +23,6 @@ func main() {
 	linkShortener := shortener.New(repository)
 	urlHandler := handler.New(linkShortener)
 	server := http.NewServer(args.ServerAddress, urlHandler)
-	err = server.Start()
 
-	if err != nil {
-		log.Fatal(err)
-	}
+	log.Fatal(server.Start())
 }

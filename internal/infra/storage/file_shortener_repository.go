@@ -57,7 +57,7 @@ func (file *FileShortenerRepository) GetAll() map[string]*entity.URL {
 	return file.urls
 }
 
-func (file *FileShortenerRepository) Put(originalURL string) (string, error) {
+func (file *FileShortenerRepository) Create(originalURL string) (string, error) {
 	baseURL, err := valueobject.NewBaseURL(file.baseURL)
 
 	if err != nil {
@@ -65,12 +65,11 @@ func (file *FileShortenerRepository) Put(originalURL string) (string, error) {
 	}
 
 	f, err := os.OpenFile(file.filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	defer file.close(f)
 
 	if err != nil {
 		return "", fmt.Errorf("%w: %v", ErrOpenFile, err.Error())
 	}
-
-	defer file.close(f)
 
 	encoder := json.NewEncoder(f)
 
@@ -105,12 +104,11 @@ func (file *FileShortenerRepository) ReadAll() error {
 	}
 
 	f, err := os.OpenFile(file.filePath, os.O_RDONLY|os.O_CREATE, 0666)
+	defer file.close(f)
 
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrOpenFile, err.Error())
 	}
-
-	defer file.close(f)
 
 	decoder := json.NewDecoder(f)
 
