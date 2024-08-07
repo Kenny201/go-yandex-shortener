@@ -22,6 +22,7 @@ func (rm *RepositoryMemory) Get(id string) (*aggregate.URL, error) {
 
 	if !ok {
 		err := fmt.Errorf("url %v not found", id)
+    
 		return nil, err
 	}
 

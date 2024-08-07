@@ -65,7 +65,6 @@ func ParseBaseURL(s string) (map[string]string, error) {
 
 	if err != nil {
 		return parsedURL, ErrSplitHostPort
-
 	}
 
 	parsedURL["scheme"] = u.Scheme
