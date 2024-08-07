@@ -7,7 +7,7 @@ import (
 type Repository interface {
 	Get(id string) (*entity.URL, error)
 	GetAll() map[string]*entity.URL
-	Put(originalURL string) (string, error)
+	Create(originalURL string) (string, error)
 }
 
 type Shortener struct {
@@ -18,8 +18,8 @@ func New(repository Repository) *Shortener {
 	return &Shortener{repository: repository}
 }
 
-// Get Получить сокращённую ссылку
-func (s *Shortener) Get(shortKey string) (*entity.URL, error) {
+// GetShortURL Получить сокращённую ссылку
+func (s *Shortener) GetShortURL(shortKey string) (*entity.URL, error) {
 	result, err := s.repository.Get(shortKey)
 
 	if err != nil {
@@ -29,11 +29,11 @@ func (s *Shortener) Get(shortKey string) (*entity.URL, error) {
 	return result, nil
 }
 
-// Put Сохранить url в хранилище.
+// CreateShortURL Сохранить url в хранилище.
 // Возвращает сокращённую ссылку
-func (s *Shortener) Put(originalURL string) (string, error) {
+func (s *Shortener) CreateShortURL(originalURL string) (string, error) {
 	// Сохраняем ссылку в хранилище и получаем обратно
-	shortURL, err := s.repository.Put(originalURL)
+	shortURL, err := s.repository.Create(originalURL)
 
 	if err != nil {
 		return "", err
@@ -42,6 +42,6 @@ func (s *Shortener) Put(originalURL string) (string, error) {
 	return shortURL, nil
 }
 
-func (s *Shortener) GetAll() map[string]*entity.URL {
+func (s *Shortener) GetAllShortURL() map[string]*entity.URL {
 	return s.repository.GetAll()
 }
