@@ -5,9 +5,20 @@ import (
 	"os"
 )
 
+const (
+	defaultServerAddress   = ":8080"
+	defaultBaseURL         = "http://localhost:8080"
+	defaultFileStoragePath = "tmp/Rquxc"
+
+	infoServerAddress   = "Server address host:port"
+	infoBaseURL         = "Result net address host:port"
+	infoFileStoragePath = "File storage path"
+)
+
 type Args struct {
-	ServerAddress string
-	BaseURL       string
+	ServerAddress   string
+	BaseURL         string
+	FileStoragePath string
 }
 
 func NewArgs() *Args {
@@ -17,8 +28,9 @@ func NewArgs() *Args {
 
 // ParseFlags Парсинг переменных из командной строки
 func (a *Args) ParseFlags() {
-	flag.StringVar(&a.ServerAddress, "a", ":8080", "Server address host:port")
-	flag.StringVar(&a.BaseURL, "b", "http://localhost:8080", "Result net address host:port")
+	flag.StringVar(&a.ServerAddress, "a", defaultServerAddress, infoServerAddress)
+	flag.StringVar(&a.BaseURL, "b", defaultBaseURL, infoBaseURL)
+	flag.StringVar(&a.FileStoragePath, "f", defaultFileStoragePath, infoFileStoragePath)
 	flag.Parse()
 
 	a.setArgsFromEnv()
@@ -33,10 +45,15 @@ func (a *Args) setArgsFromEnv() {
 	if baseURL := os.Getenv("SHORTENER_BASE_URL"); baseURL != "" {
 		a.BaseURL = baseURL
 	}
+
+	if fileStoragePath := os.Getenv("FILE_STORAGE_PATH"); fileStoragePath != "" {
+		a.FileStoragePath = fileStoragePath
+	}
 }
 
 // SetArgs Установить аргументы
-func (a *Args) SetArgs(serverAddress string, BaseURL string) {
+func (a *Args) SetArgs(serverAddress, baseURL, fileStoragePath string) {
 	a.ServerAddress = serverAddress
-	a.BaseURL = BaseURL
+	a.BaseURL = baseURL
+	a.FileStoragePath = fileStoragePath
 }

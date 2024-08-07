@@ -1,11 +1,11 @@
 package http
 
 import (
-	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
 	"github.com/go-chi/chi/v5"
+
+	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
 )
 
-// Routes returns the initialized router
 func (s *Server) useRoutes() *chi.Mux {
 	r := chi.NewRouter()
 
@@ -18,9 +18,7 @@ func (s *Server) useRoutes() *chi.Mux {
 	r.Get("/{id}", s.handler.Get)
 
 	r.Route("/api", func(r chi.Router) {
-		r.Route("/shorten", func(r chi.Router) {
-			r.Post("/", s.handler.PostAPI)
-		})
+		r.Post("/shorten", s.handler.PostAPI)
 	})
 
 	return r

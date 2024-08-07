@@ -2,39 +2,59 @@ package handler
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
-	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
+	"github.com/go-chi/chi/v5"
+
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
-	"github.com/go-chi/chi/v5"
 )
+
+const (
+	baseURL         = "http://localhost:8080"
+	URL             = "http://localhost:8080"
+	fileStoragePath = "tmp/Rquxc"
+)
+
+var repositoryMemory = storage.NewMemoryShortenerRepository(baseURL)
+var repositoryFile, _ = storage.NewFileShortenerRepository(baseURL, fileStoragePath)
+
+var reps = []shortener.Repository{
+	repositoryMemory,
+	repositoryFile,
+}
 
 func TestPostHandler(t *testing.T) {
 	tests := []struct {
 		name                    string
 		body                    string
+		repositories            []shortener.Repository
 		wantResponseContentType string
 		wantStatusCode          int
 	}{
 		{
-			name:                    "post request for body https://yandex.ru",
+			name:                    "post_request_for_body_https://yandex.ru",
 			body:                    "https://yandex.ru",
+			repositories:            reps,
 			wantResponseContentType: "text/plain",
 			wantStatusCode:          http.StatusCreated,
 		},
 		{
-			name:                    "post request for body https://practicum.yandex.ru",
+			name:                    "post_request_for_body_https://practicum.yandex.ru",
 			body:                    "https://practicum.yandex.ru",
+			repositories:            reps,
 			wantResponseContentType: "text/plain",
 			wantStatusCode:          http.StatusCreated,
 		},
 		{
-			name:                    "post request for empty body",
+			name:                    "post_request_for_empty_body",
 			body:                    "",
+			repositories:            reps,
 			wantResponseContentType: "text/plain; charset=utf-8",
 			wantStatusCode:          http.StatusBadRequest,
 		},
@@ -42,33 +62,25 @@ func TestPostHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := config.NewArgs()
-			args.SetArgs(":8080", "http://localhost:8080")
+			for _, repository := range tt.repositories {
+				rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+				linkShortener := shortener.New(repository)
+				New(linkShortener).Post(rw, r)
 
-			req := httptest.NewRequest(http.MethodPost, "http://localhost:8080/", strings.NewReader(tt.body))
-			w := httptest.NewRecorder()
-			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
+				response := rw.Result()
+				defer responseClose(t, response)
 
-			New(ss).Post(w, req)
-
-			res := w.Result()
-
-			if res.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status %v; got %v", res.StatusCode, tt.wantStatusCode)
-			}
-
-			if ctype := res.Header.Get("Content-Type"); ctype != tt.wantResponseContentType {
-				t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
-					ctype, tt.wantResponseContentType)
-			}
-
-			defer func() {
-				err := res.Body.Close()
-				if err != nil {
-					t.Errorf("failed to close response body: %v", err)
+				if response.StatusCode != tt.wantStatusCode {
+					t.Errorf("excpected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
 				}
-			}()
+
+				if response.Header.Get("Content-Type") != tt.wantResponseContentType {
+					t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
+						response.Header.Get("Content-Type"), tt.wantResponseContentType)
+				}
+			}
 		})
+
 	}
 }
 
@@ -77,74 +89,67 @@ func TestGetHandler(t *testing.T) {
 		name               string
 		body               string
 		id                 string
+		repositories       []shortener.Repository
 		wantLocationHeader string
 		wantStatusCode     int
 	}{
 		{
-			name:               "redirect for body https://yandex.ru",
+			name:               "redirect_for_body_https://yandex.ru",
 			body:               "https://yandex.ru",
+			repositories:       reps,
 			wantLocationHeader: "https://yandex.ru",
 			wantStatusCode:     http.StatusTemporaryRedirect,
 		},
 		{
-			name:               "redirect for body https://practicum.yandex.ru",
+			name:               "redirect_for_body_https://practicum.yandex.ru",
 			body:               "https://practicum.yandex.ru",
+			repositories:       reps,
 			wantLocationHeader: "https://practicum.yandex.ru",
 			wantStatusCode:     http.StatusTemporaryRedirect,
 		},
 		{
-			name:           "id not found",
+			name:           "id_not_found",
 			body:           "https://yandex.ru",
 			id:             "sdsds",
+			repositories:   reps,
 			wantStatusCode: http.StatusNotFound,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			for _, repository := range tt.repositories {
+				rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+				linkShortener := shortener.New(repository)
 
-			// Установка аргументов командной строки
-			args := config.NewArgs()
-			args.SetArgs(":8080", "http://localhost:8080")
+				handler := New(linkShortener)
+				handler.Post(rw, req)
+				responsePost := rw.Result()
+				defer responseClose(t, responsePost)
 
-			req := httptest.NewRequest(http.MethodPost, "http://localhost:8080", strings.NewReader(tt.body))
-			responseForPost := httptest.NewRecorder()
-			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
+				// Получает shortKey из строки сокращённого url
+				shortKey := getShortKeyFromShortedURL(t, responsePost.Body)
 
-			handler := New(ss)
-			handler.Post(responseForPost, req)
-
-			urlStorage := ss.Sr.GetAll()
-
-			for _, v := range urlStorage {
-				req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/", nil)
-
-				chiCtx := chi.NewRouteContext()
-				req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, chiCtx))
+				req = httptest.NewRequest(http.MethodGet, URL, nil)
 
 				if tt.id != "" {
-					chiCtx.URLParams.Add("id", tt.id)
+					req = withURLParam(req, "id", tt.id)
 				} else {
-					chiCtx.URLParams.Add("id", v.ID())
+					req = withURLParam(req, "id", shortKey)
 				}
 
-				responseForGet := httptest.NewRecorder()
-				handler.Get(responseForGet, req)
-				res := responseForGet.Result()
+				w := httptest.NewRecorder()
+				handler.Get(w, req)
+				responseGet := w.Result()
+				defer responseClose(t, responseGet)
 
-				if res.StatusCode != tt.wantStatusCode {
-					t.Errorf("excpected status: got %v want %v", res.StatusCode, tt.wantStatusCode)
+				if responseGet.StatusCode != tt.wantStatusCode {
+					t.Errorf("excpected status: got %v want %v", responseGet.StatusCode, tt.wantStatusCode)
 				}
 
-				if location := res.Header.Get("Location"); location != tt.wantLocationHeader {
+				if responseGet.Header.Get("Location") != tt.wantLocationHeader {
 					t.Errorf("location header does not match: got %v want %v",
-						location, tt.wantLocationHeader)
-				}
-
-				err := res.Body.Close()
-
-				if err != nil {
-					t.Errorf("failed to close response body: %v", err)
+						responseGet.Header.Get("Location"), tt.wantLocationHeader)
 				}
 			}
 		})
@@ -155,64 +160,101 @@ func TestPostAPIHandler(t *testing.T) {
 	tests := []struct {
 		name                    string
 		body                    string
-		wantResponseContentType string
+		repositories            []shortener.Repository
 		wantStatusCode          int
+		wantResponseContentType string
 	}{
 		{
 			name:                    "post json request for body https://yandex.ru",
 			body:                    `{"url": "https://yandex.ru"}`,
-			wantResponseContentType: "application/json",
+			repositories:            reps,
 			wantStatusCode:          http.StatusCreated,
+			wantResponseContentType: "application/json",
 		},
 		{
 			name:                    "post json request for body https://practicum.yandex.ru",
 			body:                    `{"url": "https://practicum.yandex.ru"}`,
-			wantResponseContentType: "application/json",
+			repositories:            reps,
 			wantStatusCode:          http.StatusCreated,
+			wantResponseContentType: "application/json",
 		},
 		{
 			name:                    "post json request for empty body",
 			body:                    "",
-			wantResponseContentType: "application/json",
+			repositories:            reps,
 			wantStatusCode:          http.StatusBadRequest,
+			wantResponseContentType: "application/json",
 		},
 		{
 			name:                    "post request when body isn`t json type",
 			body:                    "https://practicum.yandex.ru",
-			wantResponseContentType: "application/json",
+			repositories:            reps,
 			wantStatusCode:          http.StatusBadRequest,
+			wantResponseContentType: "application/json",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := config.NewArgs()
-			args.SetArgs(":8080", "http://localhost:8080")
+			for _, repository := range tt.repositories {
+				rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+				linkShortener := shortener.New(repository)
 
-			req := httptest.NewRequest(http.MethodPost, "http://localhost:8080/api/shorten", strings.NewReader(tt.body))
+				New(linkShortener).PostAPI(rw, req)
 
-			w := httptest.NewRecorder()
-			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
+				response := rw.Result()
+				defer responseClose(t, response)
 
-			New(ss).PostAPI(w, req)
-
-			res := w.Result()
-
-			if res.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status %v; got %v", res.StatusCode, tt.wantStatusCode)
-			}
-
-			if ctype := res.Header.Get("Content-Type"); ctype != tt.wantResponseContentType {
-				t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
-					ctype, tt.wantResponseContentType)
-			}
-
-			defer func() {
-				err := res.Body.Close()
-				if err != nil {
-					t.Errorf("failed to close response body: %v", err)
+				if response.StatusCode != tt.wantStatusCode {
+					t.Errorf("excpected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
 				}
-			}()
+
+				if response.Header.Get("Content-Type") != tt.wantResponseContentType {
+					t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
+						response.Header.Get("Content-Type"), tt.wantResponseContentType)
+				}
+			}
 		})
 	}
+}
+
+func responseClose(t *testing.T, response *http.Response) {
+	t.Helper()
+	err := response.Body.Close()
+	if err != nil {
+		t.Errorf("failed to close response body: %v", err.Error())
+	}
+}
+
+func sendRequest(method, url string, body io.Reader) (*httptest.ResponseRecorder, *http.Request) {
+	req := httptest.NewRequest(method, url, body)
+	return httptest.NewRecorder(), req
+}
+
+func withURLParam(r *http.Request, key, value string) *http.Request {
+	chiCtx := chi.NewRouteContext()
+	req := r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, chiCtx))
+	chiCtx.URLParams.Add(key, value)
+	return req
+}
+
+func getShortKeyFromShortedURL(t *testing.T, body io.ReadCloser) string {
+	t.Helper()
+	var host *url.URL
+
+	shortURL, err := io.ReadAll(body)
+
+	if err != nil {
+		t.Errorf("failed to read response body: %v", err.Error())
+	}
+
+	host, err = url.Parse(string(shortURL))
+
+	if err != nil {
+		t.Errorf("failed to parse url string: %v", err.Error())
+	}
+
+	shortKey := strings.TrimLeft(host.RequestURI(), "/")
+
+	return shortKey
 }

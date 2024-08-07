@@ -43,8 +43,6 @@ func Logger(next http.Handler) http.Handler {
 			responseData:   responseData,
 		}
 
-		next.ServeHTTP(&lw, r)
-
 		slog.Info(
 			"Request Info",
 			slog.String("uri", r.RequestURI),
@@ -57,5 +55,7 @@ func Logger(next http.Handler) http.Handler {
 			slog.Int("status", responseData.status),
 			slog.Int("size", responseData.size),
 		)
+
+		next.ServeHTTP(&lw, r)
 	})
 }

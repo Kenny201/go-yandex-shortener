@@ -51,6 +51,8 @@ func ParseBaseURL(s string) (map[string]string, error) {
 	schemeAndHost := strings.Split(s, "://")
 	var host, port string
 
+	// Если получили только хост без схемы,
+	// записываем в переменную строковый url с хостом без схемы для последующей выдачи ошибки
 	if len(schemeAndHost) == 1 {
 		s = fmt.Sprintf("://%s", schemeAndHost[0])
 	}

@@ -1,14 +1,19 @@
 package config
 
 import (
-	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/http/handler"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/http/handler"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
+)
+
+const (
+	URL = "http://localhost:8080"
 )
 
 func TestFlagsWithError(t *testing.T) {
@@ -43,38 +48,30 @@ func TestFlagsWithError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := NewArgs()
-			args.SetArgs(tt.args["shortener_server_address"], tt.args["shortener_base_url"])
+			args := initArgs(tt.args["shortener_server_address"], tt.args["shortener_base_url"], "")
+			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 
-			req := httptest.NewRequest(http.MethodPost, tt.args["shortener_server_address"], strings.NewReader(tt.body))
-			w := httptest.NewRecorder()
+			repository := storage.NewMemoryShortenerRepository(args.BaseURL)
+			linkShortener := shortener.New(repository)
 
-			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
+			handler.New(linkShortener).Post(rw, r)
 
-			handler.New(ss).Post(w, req)
+			res := rw.Result()
+			defer responseClose(t, res)
 
-			res := w.Result()
 			body, err := io.ReadAll(res.Body)
 
 			if err != nil {
 				t.Fatalf("could not read response:%v", err)
 			}
 
-			if error := string(body); error != tt.wantError {
-				t.Errorf("error handler not correct: got %v want %v",
-					error, tt.wantError)
+			if string(body) != tt.wantError {
+				t.Errorf("error handler not correct: got %v want %v", string(body), tt.wantError)
 			}
 
 			if res.StatusCode != tt.wantStatusCode {
 				t.Errorf("excpected status: got %v want %v", res.StatusCode, tt.wantStatusCode)
 			}
-
-			defer func() {
-				err := res.Body.Close()
-				if err != nil {
-					t.Errorf("failed to close response body: %v", err)
-				}
-			}()
 		})
 	}
 }
@@ -108,37 +105,46 @@ func TestFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := NewArgs()
-			args.SetArgs(tt.args["shortener_server_address"], tt.args["shortener_base_url"])
+			args := initArgs(tt.args["shortener_server_address"], tt.args["shortener_base_url"], "")
+			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 
-			req, err := http.NewRequest(http.MethodPost, tt.args["shortener_server_address"], strings.NewReader(tt.body))
+			repository := storage.NewMemoryShortenerRepository(args.BaseURL)
+			service := shortener.New(repository)
 
-			if err != nil {
-				t.Fatalf("method not alowed: %v", err)
-			}
+			handler.New(service).Post(rw, r)
 
-			w := httptest.NewRecorder()
+			res := rw.Result()
+			defer responseClose(t, res)
 
-			ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
-
-			handler.New(ss).Post(w, req)
-
-			res := w.Result()
+			_, err := io.ReadAll(res.Body)
 
 			if err != nil {
 				t.Fatalf("could not read response:%v", err)
 			}
 
 			if res.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status %v; got %v", tt.wantStatusCode, res.StatusCode)
+				t.Errorf("excpected status: got %v want %v", res.StatusCode, tt.wantStatusCode)
 			}
-
-			defer func() {
-				err := res.Body.Close()
-				if err != nil {
-					t.Errorf("failed to close response body: %v", err)
-				}
-			}()
 		})
 	}
+}
+
+func initArgs(serverAddress, baseURL, filePath string) *Args {
+	args := NewArgs()
+	args.SetArgs(serverAddress, baseURL, filePath)
+
+	return args
+}
+
+func responseClose(t *testing.T, response *http.Response) {
+	t.Helper()
+	err := response.Body.Close()
+	if err != nil {
+		t.Errorf("failed to close response body: %v", err.Error())
+	}
+}
+
+func sendRequest(method, url string, body io.Reader) (*httptest.ResponseRecorder, *http.Request) {
+	req := httptest.NewRequest(method, url, body)
+	return httptest.NewRecorder(), req
 }

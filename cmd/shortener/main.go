@@ -14,11 +14,18 @@ func main() {
 	args := config.NewArgs()
 	args.ParseFlags()
 
-	ss := shortener.NewService(args.BaseURL, storage.NewRepositoryMemory())
+	repository, err := storage.NewFileShortenerRepository(args.BaseURL, args.FileStoragePath)
 
-	urlHandler := handler.New(ss)
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	linkShortener := shortener.New(repository)
+	urlHandler := handler.New(linkShortener)
 	server := http.NewServer(args.ServerAddress, urlHandler)
+	err = server.Start()
 
-	log.Fatal(server.Start())
+	if err != nil {
+		log.Fatal(err)
+	}
 }
