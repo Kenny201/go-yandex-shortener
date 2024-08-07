@@ -15,9 +15,13 @@ func main() {
 	args.ParseFlags()
 
 	repository, err := storage.NewFileShortenerRepository(args.BaseURL, args.FileStoragePath)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	linkShortener := shortener.New(repository)
 	urlHandler := handler.New(linkShortener)
-
 	server := http.NewServer(args.ServerAddress, urlHandler)
 	err = server.Start()
 
