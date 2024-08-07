@@ -69,7 +69,6 @@ func testRequestWithAcceptedEncodings(t *testing.T, ts *httptest.Server, method,
 	}
 
 	resp, err := http.DefaultClient.Do(req)
-	defer resp.Body.Close()
 
 	if err != nil {
 		t.Fatal(err)
@@ -77,6 +76,8 @@ func testRequestWithAcceptedEncodings(t *testing.T, ts *httptest.Server, method,
 	}
 
 	respBody := decodeResponseBody(t, resp)
+
+	defer resp.Body.Close()
 
 	return resp, respBody
 }
@@ -86,8 +87,6 @@ func decodeResponseBody(t *testing.T, resp *http.Response) string {
 	var err error
 
 	reader, err = gzip.NewReader(resp.Body)
-	defer reader.Close()
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,6 +97,8 @@ func decodeResponseBody(t *testing.T, resp *http.Response) string {
 		t.Fatal(err)
 		return ""
 	}
+
+	defer reader.Close()
 
 	return string(respBody)
 }
