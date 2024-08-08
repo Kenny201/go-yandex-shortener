@@ -48,9 +48,9 @@ func TestFlagsWithError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := initArgs(tt.args["shortener_server_address"], tt.args["shortener_base_url"], "")
-			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+			args := initArgs(t, tt.args["shortener_server_address"], tt.args["shortener_base_url"], "")
 
+			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 			repository := storage.NewMemoryShortenerRepository(args.BaseURL)
 			linkShortener := shortener.New(repository)
 
@@ -105,7 +105,8 @@ func TestFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := initArgs(tt.args["shortener_server_address"], tt.args["shortener_base_url"], "")
+			args := initArgs(t, tt.args["shortener_server_address"], tt.args["shortener_base_url"], "")
+
 			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 
 			repository := storage.NewMemoryShortenerRepository(args.BaseURL)
@@ -129,8 +130,15 @@ func TestFlags(t *testing.T) {
 	}
 }
 
-func initArgs(serverAddress, baseURL, filePath string) *Args {
-	args := NewArgs()
+func initArgs(t *testing.T, serverAddress, baseURL, filePath string) *Args {
+	t.Helper()
+	conf, err := LoadConfig("../../../")
+
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+
+	args := NewArgs(conf)
 	args.SetArgs(serverAddress, baseURL, filePath)
 
 	return args

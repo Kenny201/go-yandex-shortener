@@ -11,25 +11,23 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/closer"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
-const (
-	baseURL         = "http://localhost:8080"
-	URL             = "http://localhost:8080"
-	fileStoragePath = "tmp/Rquxc"
-)
-
-var repositoryMemory = storage.NewMemoryShortenerRepository(baseURL)
-var repositoryFile, _ = storage.NewFileShortenerRepository(baseURL, fileStoragePath)
-
-var reps = []shortener.Repository{
-	repositoryMemory,
-	repositoryFile,
-}
-
 func TestPostHandler(t *testing.T) {
+	var args = initArgs(t)
+
+	var repositoryMemory = storage.NewMemoryShortenerRepository(args.BaseURL)
+	var repositoryFile, _ = storage.NewFileShortenerRepository(args.BaseURL, args.FileStoragePath)
+
+	reps := []shortener.Repository{
+		repositoryMemory,
+		repositoryFile,
+	}
+
 	tests := []struct {
 		name                    string
 		body                    string
@@ -63,7 +61,7 @@ func TestPostHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, repository := range tt.repositories {
-				rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+				rw, r := sendRequest(http.MethodPost, args.BaseURL, strings.NewReader(tt.body))
 				linkShortener := shortener.New(repository)
 				New(linkShortener).Post(rw, r)
 
@@ -85,6 +83,16 @@ func TestPostHandler(t *testing.T) {
 }
 
 func TestGetHandler(t *testing.T) {
+	var args = initArgs(t)
+
+	var repositoryMemory = storage.NewMemoryShortenerRepository(args.BaseURL)
+	var repositoryFile, _ = storage.NewFileShortenerRepository(args.BaseURL, args.FileStoragePath)
+
+	reps := []shortener.Repository{
+		repositoryMemory,
+		repositoryFile,
+	}
+
 	tests := []struct {
 		name               string
 		body               string
@@ -119,7 +127,7 @@ func TestGetHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, repository := range tt.repositories {
-				rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+				rw, req := sendRequest(http.MethodPost, args.BaseURL, strings.NewReader(tt.body))
 				linkShortener := shortener.New(repository)
 
 				handler := New(linkShortener)
@@ -130,7 +138,7 @@ func TestGetHandler(t *testing.T) {
 				// Получает shortKey из строки сокращённого url
 				shortKey := getShortKeyFromShortedURL(t, responsePost.Body)
 
-				req = httptest.NewRequest(http.MethodGet, URL, nil)
+				req = httptest.NewRequest(http.MethodGet, args.BaseURL, nil)
 
 				if tt.id != "" {
 					req = withURLParam(req, "id", tt.id)
@@ -157,6 +165,16 @@ func TestGetHandler(t *testing.T) {
 }
 
 func TestPostAPIHandler(t *testing.T) {
+	var args = initArgs(t)
+
+	var repositoryMemory = storage.NewMemoryShortenerRepository(args.BaseURL)
+	var repositoryFile, _ = storage.NewFileShortenerRepository(args.BaseURL, args.FileStoragePath)
+
+	reps := []shortener.Repository{
+		repositoryMemory,
+		repositoryFile,
+	}
+
 	tests := []struct {
 		name                    string
 		body                    string
@@ -197,7 +215,8 @@ func TestPostAPIHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, repository := range tt.repositories {
-				rw, req := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+				rw, req := sendRequest(http.MethodPost, args.BaseURL, strings.NewReader(tt.body))
+
 				linkShortener := shortener.New(repository)
 
 				New(linkShortener).PostAPI(rw, req)
@@ -216,6 +235,61 @@ func TestPostAPIHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPingHandler(t *testing.T) {
+	args := initArgs(t)
+	cl := closer.New()
+
+	repositoryDB, err := storage.NewDatabaseShortenerRepository(args.BaseURL, args.DatabaseDNS, cl)
+
+	if err != nil {
+		t.Errorf("%v with databaseDNS: %s", err.Error(), args.DatabaseDNS)
+	}
+
+	tests := []struct {
+		name                    string
+		body                    string
+		repository              *storage.DatabaseShortenerRepository
+		wantStatusCode          int
+		wantResponseContentType string
+	}{
+		{
+			name:           "test ping handler",
+			repository:     repositoryDB,
+			wantStatusCode: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rw, req := sendRequest(http.MethodGet, args.BaseURL, strings.NewReader(tt.body))
+			linkShortener := shortener.New(tt.repository)
+
+			New(linkShortener).Ping(rw, req)
+
+			response := rw.Result()
+			defer responseClose(t, response)
+
+			if response.StatusCode != tt.wantStatusCode {
+				t.Errorf("excpected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
+			}
+		})
+	}
+}
+
+func initArgs(t *testing.T) *config.Args {
+	t.Helper()
+	conf, err := config.LoadConfig("../../../")
+
+	if err != nil {
+		t.Errorf("error read config %v", err)
+	}
+
+	args := config.NewArgs(conf)
+	args.InitArgs()
+
+	return args
 }
 
 func responseClose(t *testing.T, response *http.Response) {

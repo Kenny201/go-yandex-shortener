@@ -2,35 +2,45 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"os"
 )
 
 const (
-	defaultServerAddress   = ":8080"
-	defaultBaseURL         = "http://localhost:8080"
 	defaultFileStoragePath = "tmp/Rquxc"
 
 	infoServerAddress   = "Server address host:port"
 	infoBaseURL         = "Result net address host:port"
 	infoFileStoragePath = "File storage path"
+	infoDatabaseDNS     = "Database DNS format: postgres://username:password@host:port/dbname?sslmode=disable"
 )
 
 type Args struct {
 	ServerAddress   string
 	BaseURL         string
 	FileStoragePath string
+	DatabaseDNS     string
+	config          *Config
 }
 
-func NewArgs() *Args {
-	return &Args{}
-}
+func NewArgs(config *Config) *Args {
+	args := &Args{}
 
+	args.config = config
+
+	return args
+}
 
 // ParseFlags Парсинг переменных из командной строки
 func (a *Args) ParseFlags() {
+	defaultDatabaseDNS := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", a.config.DBUsername, a.config.DBPassword, a.config.DBHost, a.config.DBPort, a.config.DBDatabase)
+	defaultServerAddress := fmt.Sprintf(":%s", a.config.Port)
+	defaultBaseURL := fmt.Sprintf("http://localhost:%s", a.config.Port)
+
 	flag.StringVar(&a.ServerAddress, "a", defaultServerAddress, infoServerAddress)
 	flag.StringVar(&a.BaseURL, "b", defaultBaseURL, infoBaseURL)
 	flag.StringVar(&a.FileStoragePath, "f", defaultFileStoragePath, infoFileStoragePath)
+	flag.StringVar(&a.DatabaseDNS, "d", defaultDatabaseDNS, infoDatabaseDNS)
 	flag.Parse()
 
 	a.setArgsFromEnv()
@@ -49,6 +59,10 @@ func (a *Args) setArgsFromEnv() {
 	if fileStoragePath := os.Getenv("FILE_STORAGE_PATH"); fileStoragePath != "" {
 		a.FileStoragePath = fileStoragePath
 	}
+
+	if databaseDNS := os.Getenv("DATABASE_DSN"); databaseDNS != "" {
+		a.DatabaseDNS = databaseDNS
+	}
 }
 
 // SetArgs Установить аргументы
@@ -56,4 +70,11 @@ func (a *Args) SetArgs(serverAddress, baseURL, fileStoragePath string) {
 	a.ServerAddress = serverAddress
 	a.BaseURL = baseURL
 	a.FileStoragePath = fileStoragePath
+}
+
+func (a *Args) InitArgs() {
+	a.ServerAddress = fmt.Sprintf(":%s", a.config.Port)
+	a.BaseURL = fmt.Sprintf("http://localhost:%s", a.config.Port)
+	a.FileStoragePath = defaultFileStoragePath
+	a.DatabaseDNS = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", a.config.DBUsername, a.config.DBPassword, a.config.DBHost, a.config.DBPort, a.config.DBDatabase)
 }
