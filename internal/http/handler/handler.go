@@ -3,11 +3,13 @@ package handler
 import (
 	"errors"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
 const (
@@ -26,19 +28,14 @@ var (
 )
 
 type (
-	ShortenerService interface {
-		CreateShortURL(url string) (string, error)
-		GetShortURL(url string) (*entity.URL, error)
-	}
-
 	Handler struct {
-		shortenerService ShortenerService
+		shortenerService shortener.Shortener
 	}
 )
 
-func New(ss ShortenerService) Handler {
+func New(ss *shortener.Shortener) Handler {
 	return Handler{
-		shortenerService: ss,
+		shortenerService: *ss,
 	}
 }
 
@@ -80,4 +77,22 @@ func (sh Handler) Post(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
+}
+
+func (sh Handler) Ping(w http.ResponseWriter, r *http.Request) {
+	var value interface{} = sh.shortenerService.Repository
+
+	switch value.(type) {
+	case *storage.DatabaseShortenerRepository:
+		db := value.(*storage.DatabaseShortenerRepository).DB
+
+		if err := db.Ping(); err != nil {
+			db.Close()
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+
+		w.WriteHeader(http.StatusOK)
+	default:
+		log.Fatal("Can't use this strategy to work with the database!")
+	}
 }
