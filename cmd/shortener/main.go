@@ -16,8 +16,6 @@ import (
 )
 
 func main() {
-	var repository shortener.Repository
-
 	conf, err := config.LoadConfig("./")
 
 	if err != nil {
@@ -33,10 +31,17 @@ func main() {
 
 	cl := closer.New()
 
-	repository, err = storage.NewDatabaseShortenerRepository(args.BaseURL, args.DatabaseDNS, cl)
+	repository, err := storage.NewDatabaseShortenerRepository(args.BaseURL, args.DatabaseDNS, cl)
 
 	if err != nil {
 		slog.Error(err.Error(), slog.String("databaseDNS", args.DatabaseDNS))
+		os.Exit(1)
+	}
+
+	err = repository.Migrate()
+
+	if err != nil {
+		slog.Error(err.Error())
 		os.Exit(1)
 	}
 
