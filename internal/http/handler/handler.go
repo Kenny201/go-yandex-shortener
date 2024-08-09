@@ -3,7 +3,7 @@ package handler
 import (
 	"errors"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -93,6 +93,7 @@ func (sh Handler) Ping(w http.ResponseWriter, r *http.Request) {
 
 		w.WriteHeader(http.StatusOK)
 	default:
-		log.Fatal("Can't use this strategy to work with the database!")
+		slog.Error("Can't use this repository to work with the database!")
+		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
