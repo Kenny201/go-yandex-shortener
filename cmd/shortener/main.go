@@ -12,11 +12,11 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http/handler"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/closer"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
 func main() {
 	conf, err := config.LoadConfig("./")
+	var linkShortener *shortener.Shortener
 
 	if err != nil {
 		slog.Error("error read config %v", slog.String("error", err.Error()))
@@ -31,21 +31,15 @@ func main() {
 
 	cl := closer.New()
 
-	repository, err := storage.NewDatabaseShortenerRepository(args.BaseURL, args.DatabaseDNS, cl)
+	repository, err := args.InitRepository(cl)
 
 	if err != nil {
-		slog.Error(err.Error(), slog.String("databaseDNS", args.DatabaseDNS))
+		slog.Error("Repository initialization error", slog.String("Error", err.Error()))
 		os.Exit(1)
 	}
 
-	err = repository.Migrate()
+	linkShortener = shortener.New(repository)
 
-	if err != nil {
-		slog.Error(err.Error())
-		os.Exit(1)
-	}
-
-	linkShortener := shortener.New(repository)
 	urlHandler := handler.New(linkShortener)
 
 	http.NewServer(ctx, args.ServerAddress, urlHandler, cl).Start()

@@ -83,14 +83,14 @@ func (d *DatabaseShortenerRepository) Create(originalURL string) (string, error)
 	shortURL := valueobject.NewShortURL(baseURL)
 	urlEntity := entity.NewURL(originalURL, shortURL.ShortKey())
 
-	stmt, err := d.DB.Prepare("INSERT INTO shorteners (short_url, original_url) values (?, ?) RETURNING id, short_url, original_url")
+	stmt, err := d.DB.Prepare("INSERT INTO shorteners (short_url, original_url) values ($1, $2) RETURNING id, short_url, original_url")
 
 	if err != nil {
-		return "", fmt.Errorf("%s, %w, %v", errInsertFailed, ErrPrepareStatement, err.Error())
+		return "", fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrPrepareStatement, err.Error())
 	}
 
 	if err := stmt.QueryRow(urlEntity.ShortKey, urlEntity.OriginalURL).Scan(&url.ID, &url.ShortKey, &url.OriginalURL); err != nil { // scan will release the connection
-		return "", fmt.Errorf("%s, %w, %v", errInsertFailed, ErrScanQuery, err.Error())
+		return "", fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrScanQuery, err.Error())
 	}
 
 	return fmt.Sprintf("%s/%s", baseURL.ToString(), url.ShortKey), nil
@@ -102,16 +102,16 @@ func (d *DatabaseShortenerRepository) Get(shortKey string) (*entity.URL, error) 
 	stmt, err := d.DB.Prepare("SELECT id, short_url, original_url FROM shorteners WHERE  short_url = $1")
 
 	if err != nil {
-		return nil, fmt.Errorf("%s, %w, %v", errGetByShortKey, ErrPrepareStatement, err.Error())
+		return nil, fmt.Errorf("%s, %w, %v, func: Get", errGetByShortKey, ErrPrepareStatement, err.Error())
 	}
 
 	if err = stmt.QueryRow(shortKey).Scan(&url.ID, &url.ShortKey, &url.OriginalURL); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("%s %w:%v ", errGetByShortKey, ErrScanQuery, err.Error())
+			return nil, fmt.Errorf("%s %w:%v,  func: Get", errGetByShortKey, ErrScanQuery, err.Error())
 		}
 
 		// нет ошибок и не нашлось записей
-		return nil, fmt.Errorf("url %v not found", shortKey)
+		return nil, fmt.Errorf("url %v not found, func: Get", shortKey)
 	}
 
 	return url, nil
@@ -126,15 +126,15 @@ func (d *DatabaseShortenerRepository) GetAll() map[string]*entity.URL {
 func (d *DatabaseShortenerRepository) checkExistsOriginalURL(originalURL string) (*entity.URL, error) {
 	url := &entity.URL{}
 
-	stmt, err := d.DB.Prepare("SELECT id, short_url, original_url FROM shorteners WHERE  original_url = ?")
+	stmt, err := d.DB.Prepare("SELECT id, short_url, original_url FROM shorteners WHERE  original_url = $1")
 
 	if err != nil {
-		return nil, fmt.Errorf("%s, %w, %v ", errInsertFailed, ErrPrepareStatement, err.Error())
+		return nil, fmt.Errorf("%s, %w, %v func:checkExistsOriginalURL", errInsertFailed, ErrPrepareStatement, err.Error())
 	}
 
 	if err = stmt.QueryRow(originalURL).Scan(&url.ID, &url.ShortKey, &url.OriginalURL); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("%s, %w, %v ", errInsertFailed, ErrScanQuery, err.Error())
+			return nil, fmt.Errorf("%s, %w, %v func:checkExistsOriginalURL", errInsertFailed, ErrScanQuery, err.Error())
 		}
 		// нет ошибок и не нашлось записей
 		return nil, nil
