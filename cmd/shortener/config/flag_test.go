@@ -20,16 +20,16 @@ func TestFlagsWithError(t *testing.T) {
 	tests := []struct {
 		name           string
 		body           string
-		args           map[string]string
+		args           []string
 		wantError      string
 		wantStatusCode int
 	}{
 		{
 			name: "incorrect base_url:not set scheme into argument shortener_base_url",
 			body: "https://yandex.ru",
-			args: map[string]string{
-				"shortener_server_address": "http://localhost:8080",
-				"shortener_base_url":       "://localhost:8080",
+			args: []string{
+				"-a", "http://localhost:8080",
+				"-b", "://localhost:8080",
 			},
 			wantError:      "failed to parse base url\n",
 			wantStatusCode: http.StatusBadRequest,
@@ -37,9 +37,9 @@ func TestFlagsWithError(t *testing.T) {
 		{
 			name: "incorrect base_url:not set port into argument shortener_base_url",
 			body: "https://practicum.yandex.ru",
-			args: map[string]string{
-				"shortener_server_address": "http://localhost:8080",
-				"shortener_base_url":       "http://localhost",
+			args: []string{
+				"-a", "http://localhost:8080",
+				"-b", "http://localhost",
 			},
 			wantError:      "failed to split host and port\n",
 			wantStatusCode: http.StatusBadRequest,
@@ -48,7 +48,7 @@ func TestFlagsWithError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := initArgs(t, tt.args["shortener_server_address"], tt.args["shortener_base_url"], "")
+			args := initArgs(t, tt.args)
 
 			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 			repository := storage.NewMemoryShortenerRepository(args.BaseURL)
@@ -80,24 +80,24 @@ func TestFlags(t *testing.T) {
 	tests := []struct {
 		name           string
 		body           string
-		args           map[string]string
+		args           []string
 		wantStatusCode int
 	}{
 		{
 			name: "set port 8080 into argument shortener_server_address",
 			body: "https://yandex.ru",
-			args: map[string]string{
-				"shortener_server_address": "http://localhost:8080",
-				"shortener_base_url":       "http://localhost:8080",
+			args: []string{
+				"-a", "http://localhost:8080",
+				"-b", "http://localhost:8080",
 			},
 			wantStatusCode: http.StatusCreated,
 		},
 		{
 			name: "set port 8090 into argument shortener_server_address",
 			body: "https://yandex.ru",
-			args: map[string]string{
-				"shortener_server_address": "http://localhost:8090",
-				"shortener_base_url":       "http://localhost:8080",
+			args: []string{
+				"-a", "http://localhost:8090",
+				"-b", "http://localhost:8080",
 			},
 			wantStatusCode: http.StatusCreated,
 		},
@@ -105,7 +105,7 @@ func TestFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := initArgs(t, tt.args["shortener_server_address"], tt.args["shortener_base_url"], "")
+			args := initArgs(t, tt.args)
 
 			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
 
@@ -130,7 +130,7 @@ func TestFlags(t *testing.T) {
 	}
 }
 
-func initArgs(t *testing.T, serverAddress, baseURL, filePath string) *Args {
+func initArgs(t *testing.T, args []string) *Args {
 	t.Helper()
 	conf, err := LoadConfig("../../../")
 
@@ -138,10 +138,10 @@ func initArgs(t *testing.T, serverAddress, baseURL, filePath string) *Args {
 		t.Errorf(err.Error())
 	}
 
-	args := NewArgs(conf)
-	args.SetArgs(serverAddress, baseURL, filePath)
+	a := NewArgs(conf)
+	a.ParseFlags(args)
 
-	return args
+	return a
 }
 
 func responseClose(t *testing.T, response *http.Response) {

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -286,10 +287,22 @@ func initArgs(t *testing.T) *config.Args {
 		t.Errorf("error read config %v", err)
 	}
 
-	args := config.NewArgs(conf)
-	args.InitArgs()
+	serverAddress := fmt.Sprintf(":%s", conf.Port)
+	baseURL := fmt.Sprintf("http://localhost:%s", conf.Port)
+	fileStoragePath := "tmp/Rquxc"
+	databaseDNS := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", conf.DBUsername, conf.DBPassword, conf.DBHost, conf.DBPort, conf.DBDatabase)
 
-	return args
+	args := []string{
+		"-a", serverAddress,
+		"-b", baseURL,
+		"-f", fileStoragePath,
+		"-d", databaseDNS,
+	}
+
+	a := config.NewArgs(conf)
+	a.ParseFlags(args)
+
+	return a
 }
 
 func responseClose(t *testing.T, response *http.Response) {

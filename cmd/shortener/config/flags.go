@@ -34,15 +34,16 @@ func NewArgs(config *Config) *Args {
 }
 
 // ParseFlags Парсинг переменных из командной строки
-func (a *Args) ParseFlags() {
+func (a *Args) ParseFlags(args []string) {
 	defaultServerAddress := fmt.Sprintf(":%s", a.config.Port)
 	defaultBaseURL := fmt.Sprintf("http://localhost:%s", a.config.Port)
 
-	flag.StringVar(&a.ServerAddress, "a", defaultServerAddress, infoServerAddress)
-	flag.StringVar(&a.BaseURL, "b", defaultBaseURL, infoBaseURL)
-	flag.StringVar(&a.FileStoragePath, "f", "", infoFileStoragePath)
-	flag.StringVar(&a.DatabaseDNS, "d", "", infoDatabaseDNS)
-	flag.Parse()
+	fs := flag.NewFlagSet("args", flag.ContinueOnError)
+	fs.StringVar(&a.ServerAddress, "a", defaultServerAddress, infoServerAddress)
+	fs.StringVar(&a.BaseURL, "b", defaultBaseURL, infoBaseURL)
+	fs.StringVar(&a.FileStoragePath, "f", "", infoFileStoragePath)
+	fs.StringVar(&a.DatabaseDNS, "d", "", infoDatabaseDNS)
+	fs.Parse(args)
 
 	a.setArgsFromEnv()
 }
@@ -66,20 +67,6 @@ func (a *Args) setArgsFromEnv() {
 	}
 }
 
-// SetArgs Установить аргументы
-func (a *Args) SetArgs(serverAddress, baseURL, fileStoragePath string) {
-	a.ServerAddress = serverAddress
-	a.BaseURL = baseURL
-	a.FileStoragePath = fileStoragePath
-}
-
-func (a *Args) InitArgs() {
-	a.ServerAddress = fmt.Sprintf(":%s", a.config.Port)
-	a.BaseURL = fmt.Sprintf("http://localhost:%s", a.config.Port)
-	a.FileStoragePath = "tmp/Rquxc"
-	a.DatabaseDNS = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", a.config.DBUsername, a.config.DBPassword, a.config.DBHost, a.config.DBPort, a.config.DBDatabase)
-}
-
 func (a *Args) InitRepository(cl *closer.Closer) (shortener.Repository, error) {
 	if a.DatabaseDNS != "" {
 		repository, err := storage.NewDatabaseShortenerRepository(a.BaseURL, a.DatabaseDNS, cl)
@@ -95,7 +82,6 @@ func (a *Args) InitRepository(cl *closer.Closer) (shortener.Repository, error) {
 		}
 
 		return repository, nil
-
 	} else if a.FileStoragePath != "" {
 		repository, err := storage.NewFileShortenerRepository(a.BaseURL, a.FileStoragePath)
 

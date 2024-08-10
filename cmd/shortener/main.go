@@ -24,7 +24,7 @@ func main() {
 	}
 
 	args := config.NewArgs(conf)
-	args.ParseFlags()
+	args.ParseFlags(os.Args[1:])
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
