@@ -239,10 +239,10 @@ func TestPostAPIHandler(t *testing.T) {
 }
 
 func TestPingHandler(t *testing.T) {
+	closer.New()
 	args := initArgs(t)
-	cl := closer.New()
 
-	repositoryDB, err := storage.NewDatabaseShortenerRepository(args.BaseURL, args.DatabaseDNS, cl)
+	repositoryDB, err := storage.NewDatabaseShortenerRepository(args.BaseURL, args.DatabaseDNS)
 
 	if err != nil {
 		t.Errorf("%v with databaseDNS: %s", err.Error(), args.DatabaseDNS)

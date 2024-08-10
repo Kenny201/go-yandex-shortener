@@ -33,7 +33,7 @@ func main() {
 	repository, err := args.InitRepository()
 
 	if err != nil {
-		slog.Error("Repository initialization error", slog.String("Error", err.Error()))
+		slog.Error(err.Error())
 		os.Exit(1)
 	}
 

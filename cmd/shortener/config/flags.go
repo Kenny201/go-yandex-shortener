@@ -71,7 +71,7 @@ func (a *Args) InitRepository() (shortener.Repository, error) {
 		repository, err := storage.NewDatabaseShortenerRepository(a.BaseURL, a.DatabaseDNS)
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("repository database initialization error: %v", err)
 		}
 
 		err = repository.Migrate()
@@ -85,7 +85,7 @@ func (a *Args) InitRepository() (shortener.Repository, error) {
 		repository, err := storage.NewFileShortenerRepository(a.BaseURL, a.FileStoragePath)
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("repository file initialization error: %v", err)
 		}
 
 		return repository, nil
