@@ -15,6 +15,7 @@ import (
 )
 
 func main() {
+	closer.New()
 	conf, err := config.LoadConfig("./")
 	var linkShortener *shortener.Shortener
 
@@ -29,9 +30,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	cl := closer.New()
-
-	repository, err := args.InitRepository(cl)
+	repository, err := args.InitRepository()
 
 	if err != nil {
 		slog.Error("Repository initialization error", slog.String("Error", err.Error()))
@@ -42,5 +41,5 @@ func main() {
 
 	urlHandler := handler.New(linkShortener)
 
-	http.NewServer(ctx, args.ServerAddress, urlHandler, cl).Start()
+	http.NewServer(ctx, args.ServerAddress, urlHandler).Start()
 }

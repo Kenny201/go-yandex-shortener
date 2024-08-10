@@ -18,11 +18,10 @@ const (
 
 type Server struct {
 	server *http.Server
-	closer *closer.Closer
 	ctx    context.Context
 }
 
-func NewServer(ctx context.Context, serverAddress string, handler handler.Handler, closer *closer.Closer) *Server {
+func NewServer(ctx context.Context, serverAddress string, handler handler.Handler) *Server {
 	server := &http.Server{
 		Addr:         serverAddress,
 		Handler:      useRoutes(handler),
@@ -31,7 +30,7 @@ func NewServer(ctx context.Context, serverAddress string, handler handler.Handle
 		IdleTimeout:  15 * time.Second,
 	}
 
-	return &Server{server, closer, ctx}
+	return &Server{server, ctx}
 }
 
 func (s *Server) Start() {
@@ -41,11 +40,11 @@ func (s *Server) Start() {
 		}
 	}()
 
-	s.closer.Add(func(ctx context.Context) error {
+	closer.CL.Add(func(ctx context.Context) error {
 		return s.server.Shutdown(s.ctx)
 	})
 
-	s.closer.Add(func(ctx context.Context) error {
+	closer.CL.Add(func(ctx context.Context) error {
 		time.Sleep(6 * time.Second)
 		return nil
 	})
@@ -60,7 +59,7 @@ func (s *Server) Start() {
 
 	defer cancel()
 
-	if err := s.closer.Close(shutdownCtx); err != nil {
+	if err := closer.CL.Close(shutdownCtx); err != nil {
 		slog.Error("Could not close", slog.String("error", err.Error()))
 		os.Exit(1)
 	}

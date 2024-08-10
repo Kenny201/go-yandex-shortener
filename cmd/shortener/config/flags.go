@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/closer"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
@@ -67,9 +66,9 @@ func (a *Args) setArgsFromEnv() {
 	}
 }
 
-func (a *Args) InitRepository(cl *closer.Closer) (shortener.Repository, error) {
+func (a *Args) InitRepository() (shortener.Repository, error) {
 	if a.DatabaseDNS != "" {
-		repository, err := storage.NewDatabaseShortenerRepository(a.BaseURL, a.DatabaseDNS, cl)
+		repository, err := storage.NewDatabaseShortenerRepository(a.BaseURL, a.DatabaseDNS)
 
 		if err != nil {
 			return nil, err

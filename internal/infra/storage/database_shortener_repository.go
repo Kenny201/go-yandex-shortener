@@ -35,10 +35,9 @@ type DatabaseShortenerRepository struct {
 	DB          *sql.DB
 	databaseDNS string
 	baseURL     string
-	closer      *closer.Closer
 }
 
-func NewDatabaseShortenerRepository(baseURL string, databaseDNS string, closer *closer.Closer) (*DatabaseShortenerRepository, error) {
+func NewDatabaseShortenerRepository(baseURL string, databaseDNS string) (*DatabaseShortenerRepository, error) {
 	db, err := sql.Open("pgx", databaseDNS)
 
 	if err != nil {
@@ -54,10 +53,9 @@ func NewDatabaseShortenerRepository(baseURL string, databaseDNS string, closer *
 		DB:          db,
 		databaseDNS: databaseDNS,
 		baseURL:     baseURL,
-		closer:      closer,
 	}
 
-	d.closer.Add(func(ctx context.Context) error {
+	closer.CL.Add(func(ctx context.Context) error {
 		return d.close()
 	})
 
