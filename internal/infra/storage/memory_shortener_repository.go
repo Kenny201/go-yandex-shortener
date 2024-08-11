@@ -9,29 +9,24 @@ import (
 
 type MemoryShortenerRepository struct {
 	baseURL string
-	urls    map[string]*entity.URL
+	urls    map[string]entity.URL
 }
 
 func NewMemoryShortenerRepository(baseURL string) *MemoryShortenerRepository {
 	return &MemoryShortenerRepository{
 		baseURL: baseURL,
-		urls:    make(map[string]*entity.URL),
+		urls:    make(map[string]entity.URL),
 	}
 }
 
 func (rm *MemoryShortenerRepository) Get(shortKey string) (*entity.URL, error) {
-	url, ok := rm.urls[shortKey]
-
-	if !ok {
-		err := fmt.Errorf("url %v not found", shortKey)
-		return nil, err
+	for _, v := range rm.urls {
+		if v.ShortKey == shortKey {
+			return &v, nil
+		}
 	}
 
-	return url, nil
-}
-
-func (rm *MemoryShortenerRepository) GetAll() map[string]*entity.URL {
-	return rm.urls
+	return nil, fmt.Errorf("url %v not found", shortKey)
 }
 
 // Create Добавить новый элемент
@@ -43,7 +38,7 @@ func (rm *MemoryShortenerRepository) Create(originalURL string) (string, error) 
 	}
 
 	//  Проверка существования записи в мапе urls.
-	if value, ok := rm.checkExistsOriginalURL(originalURL); ok {
+	if value, ok := rm.urls[originalURL]; ok {
 		return fmt.Sprintf("%s/%s", baseURL.ToString(), value.ShortKey), nil
 	}
 
@@ -51,19 +46,41 @@ func (rm *MemoryShortenerRepository) Create(originalURL string) (string, error) 
 	urlEntity := entity.NewURL(originalURL, shortURL.ShortKey())
 
 	// Сохраняем ссылку в хранилище in-memory
-	rm.urls[urlEntity.ShortKey] = urlEntity
+	rm.urls[urlEntity.OriginalURL] = *urlEntity
 
 	return shortURL.ToString(), nil
 }
 
-// Проверка существования записи в мапе
-func (rm *MemoryShortenerRepository) checkExistsOriginalURL(originalURL string) (*entity.URL, bool) {
+func (rm *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error) {
+	baseURL, err := valueobject.NewBaseURL(rm.baseURL)
+	shortUrls := make([]*entity.URLItem, 0, len(urls))
 
-	for _, value := range rm.GetAll() {
-		if value.OriginalURL == originalURL {
-			return value, true
-		}
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, false
+	for _, v := range urls {
+		//  Проверка существования записи в мапе urls.
+		if v, ok := rm.urls[v.OriginalURL]; ok {
+			shortUrls = append(
+				shortUrls,
+				&entity.URLItem{ID: v.ID, ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), v.ShortKey)},
+			)
+			continue
+		}
+
+		shortURL := valueobject.NewShortURL(baseURL)
+
+		urlEntity := &entity.URL{ID: v.ID, ShortKey: shortURL.ShortKey(), OriginalURL: v.OriginalURL}
+
+		// Сохраняем ссылку в хранилище in-memory
+		rm.urls[urlEntity.OriginalURL] = *urlEntity
+
+		shortUrls = append(
+			shortUrls,
+			&entity.URLItem{ID: v.ID, ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), shortURL.ShortKey())},
+		)
+	}
+
+	return shortUrls, nil
 }

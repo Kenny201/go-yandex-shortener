@@ -23,13 +23,13 @@ var (
 type FileShortenerRepository struct {
 	baseURL  string
 	filePath string
-	urls     map[string]*entity.URL
+	urls     map[string]entity.URL
 }
 
 func NewFileShortenerRepository(baseURL, filePath string) (*FileShortenerRepository, error) {
 	file := &FileShortenerRepository{
 		filePath: filePath,
-		urls:     make(map[string]*entity.URL),
+		urls:     make(map[string]entity.URL),
 		baseURL:  baseURL,
 	}
 
@@ -43,18 +43,13 @@ func NewFileShortenerRepository(baseURL, filePath string) (*FileShortenerReposit
 }
 
 func (file *FileShortenerRepository) Get(shortKey string) (*entity.URL, error) {
-	url, ok := file.urls[shortKey]
-
-	if !ok {
-		err := fmt.Errorf("url %v not found", shortKey)
-		return nil, err
+	for _, v := range file.urls {
+		if v.ShortKey == shortKey {
+			return &v, nil
+		}
 	}
 
-	return url, nil
-}
-
-func (file *FileShortenerRepository) GetAll() map[string]*entity.URL {
-	return file.urls
+	return nil, fmt.Errorf("url %v not found", shortKey)
 }
 
 func (file *FileShortenerRepository) Create(originalURL string) (string, error) {
@@ -74,8 +69,8 @@ func (file *FileShortenerRepository) Create(originalURL string) (string, error) 
 	encoder := json.NewEncoder(f)
 
 	// Если запись существует повторную запись не производим
-	if value, ok := file.checkExistsOriginalURL(originalURL); ok {
-		return fmt.Sprintf("%s/%s", baseURL.ToString(), value.ShortKey), nil
+	if v, ok := file.urls[originalURL]; ok {
+		return fmt.Sprintf("%s/%s", baseURL.ToString(), v.ShortKey), nil
 	}
 
 	shortURL := valueobject.NewShortURL(baseURL)
@@ -87,15 +82,74 @@ func (file *FileShortenerRepository) Create(originalURL string) (string, error) 
 	}
 
 	// Сохраняем ссылку в хранилище in-memory
-	file.urls[urlEntity.ShortKey] = urlEntity
+	file.urls[urlEntity.OriginalURL] = *urlEntity
 
 	return shortURL.ToString(), nil
+}
+
+func (file *FileShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error) {
+	baseURL, err := valueobject.NewBaseURL(file.baseURL)
+	shortUrls := make([]*entity.URLItem, 0, len(urls))
+
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := os.OpenFile(file.filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+	defer file.close(f)
+
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrOpenFile, err.Error())
+	}
+
+	encoder := json.NewEncoder(f)
+
+	for _, v := range urls {
+		// Если запись существует повторную запись не производим
+		if url, ok := file.urls[v.OriginalURL]; ok {
+			shortUrls = append(
+				shortUrls,
+				&entity.URLItem{
+					ID:       url.ID,
+					ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), url.ShortKey),
+				},
+			)
+			continue
+		}
+
+		shortURL := valueobject.NewShortURL(baseURL)
+
+		urlEntity := &entity.URL{
+			ID:          v.ID,
+			ShortKey:    shortURL.ShortKey(),
+			OriginalURL: v.OriginalURL,
+		}
+
+		err = encoder.Encode(&urlEntity)
+
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s", ErrEncodeFile, err.Error())
+		}
+
+		// Сохраняем ссылку в хранилище in-memory
+		file.urls[urlEntity.OriginalURL] = *urlEntity
+
+		shortUrls = append(
+			shortUrls,
+			&entity.URLItem{
+				ID:       v.ID,
+				ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), shortURL.ShortKey()),
+			},
+		)
+	}
+
+	return shortUrls, nil
 }
 
 // ReadAll Прочитать строки из файла и декодировать в entity.URL
 // Добавляет декодированные элементы в repositoryMemory
 func (file *FileShortenerRepository) ReadAll() error {
-	var url *entity.URL
+	var url entity.URL
 
 	err := file.makeDir()
 
@@ -123,21 +177,10 @@ func (file *FileShortenerRepository) ReadAll() error {
 			return fmt.Errorf("%w: %s", ErrDecodeFile, err.Error())
 		}
 
-		file.urls[url.ShortKey] = url
+		file.urls[url.OriginalURL] = url
 	}
 
 	return nil
-}
-
-// Проверка существования записи в файле
-func (file *FileShortenerRepository) checkExistsOriginalURL(originalURL string) (*entity.URL, bool) {
-	for _, value := range file.GetAll() {
-		if value.OriginalURL == originalURL {
-			return value, true
-		}
-	}
-
-	return nil, false
 }
 
 func (file *FileShortenerRepository) makeDir() error {

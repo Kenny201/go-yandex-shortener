@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -86,8 +87,8 @@ func (sh Handler) Ping(w http.ResponseWriter, r *http.Request) {
 	case *storage.DatabaseShortenerRepository:
 		db := value.(*storage.DatabaseShortenerRepository).DB
 
-		if err := db.Ping(); err != nil {
-			db.Close()
+		if err := db.Ping(context.Background()); err != nil {
+			db.Close(context.Background())
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 
