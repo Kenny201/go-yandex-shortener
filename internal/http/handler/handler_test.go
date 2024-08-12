@@ -11,11 +11,12 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/golang/mock/gomock"
 
 	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/closer"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/mocks"
 )
 
 func TestPostHandler(t *testing.T) {
@@ -239,33 +240,33 @@ func TestPostAPIHandler(t *testing.T) {
 }
 
 func TestPingHandler(t *testing.T) {
-	closer.New()
 	args := initArgs(t)
-
-	repositoryDB, err := storage.NewDatabaseShortenerRepository(args.BaseURL, args.DatabaseDNS)
-
-	if err != nil {
-		t.Errorf("%v with databaseDNS: %s", err.Error(), args.DatabaseDNS)
-	}
 
 	tests := []struct {
 		name                    string
 		body                    string
-		repository              *storage.DatabaseShortenerRepository
 		wantStatusCode          int
 		wantResponseContentType string
 	}{
 		{
 			name:           "test ping handler",
-			repository:     repositoryDB,
 			wantStatusCode: http.StatusOK,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			// Создаем mock для интерфейса DB
+			mockRepository := mocks.NewMockRepository(ctrl)
+
+			// Настраиваем ожидания для метода Ping
+			mockRepository.EXPECT().CheckHealth().Return(nil)
+
 			rw, req := sendRequest(http.MethodGet, args.BaseURL, strings.NewReader(tt.body))
-			linkShortener := shortener.New(tt.repository)
+			linkShortener := shortener.New(mockRepository)
 
 			New(linkShortener).Ping(rw, req)
 
