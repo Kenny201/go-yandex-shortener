@@ -33,14 +33,13 @@ func NewArgs(config *Config) *Args {
 
 // ParseFlags Парсинг переменных из командной строки
 func (a *Args) ParseFlags() {
-	defaultDatabaseDNS := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", a.config.DBUsername, a.config.DBPassword, a.config.DBHost, a.config.DBPort, a.config.DBDatabase)
 	defaultServerAddress := fmt.Sprintf(":%s", a.config.Port)
 	defaultBaseURL := fmt.Sprintf("http://localhost:%s", a.config.Port)
 
 	flag.StringVar(&a.ServerAddress, "a", defaultServerAddress, infoServerAddress)
 	flag.StringVar(&a.BaseURL, "b", defaultBaseURL, infoBaseURL)
 	flag.StringVar(&a.FileStoragePath, "f", defaultFileStoragePath, infoFileStoragePath)
-	flag.StringVar(&a.DatabaseDNS, "d", defaultDatabaseDNS, infoDatabaseDNS)
+	flag.StringVar(&a.DatabaseDNS, "d", "", infoDatabaseDNS)
 	flag.Parse()
 
 	a.setArgsFromEnv()
@@ -76,5 +75,5 @@ func (a *Args) InitArgs() {
 	a.ServerAddress = fmt.Sprintf(":%s", a.config.Port)
 	a.BaseURL = fmt.Sprintf("http://localhost:%s", a.config.Port)
 	a.FileStoragePath = defaultFileStoragePath
-	a.DatabaseDNS = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", a.config.DBUsername, a.config.DBPassword, a.config.DBHost, a.config.DBPort, a.config.DBDatabase)
+	a.DatabaseDNS = ""
 }

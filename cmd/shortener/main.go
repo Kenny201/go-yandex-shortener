@@ -33,10 +33,14 @@ func main() {
 
 	cl := closer.New()
 
-	repository, err = storage.NewDatabaseShortenerRepository(args.BaseURL, args.DatabaseDNS, cl)
+	if args.DatabaseDNS != "" {
+		repository, err = storage.NewDatabaseShortenerRepository(args.BaseURL, args.DatabaseDNS, cl)
+	} else {
+		repository, err = storage.NewFileShortenerRepository(args.BaseURL, args.FileStoragePath)
+	}
 
 	if err != nil {
-		slog.Error(err.Error(), slog.String("databaseDNS", args.DatabaseDNS))
+		slog.Error(err.Error())
 		os.Exit(1)
 	}
 
