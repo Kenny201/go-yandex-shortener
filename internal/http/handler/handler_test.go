@@ -61,8 +61,8 @@ func TestPostHandler(t *testing.T) {
 			}
 
 			rw, r := sendRequest(http.MethodPost, "/", strings.NewReader(tt.body))
-			linkShortener := shortener.New(mockRepository)
-			New(linkShortener).Post(rw, r)
+			shortenerService := shortener.New(mockRepository)
+			New(shortenerService).Post(rw, r)
 
 			response := rw.Result()
 			defer response.Body.Close()
@@ -131,8 +131,8 @@ func TestGetHandler(t *testing.T) {
 			rw, req := sendRequest(http.MethodGet, args.BaseURL, nil)
 			req = withURLParam(req, "id", tt.id)
 
-			linkShortener := shortener.New(mockRepository)
-			New(linkShortener).Get(rw, req)
+			shortenerService := shortener.New(mockRepository)
+			New(shortenerService).Get(rw, req)
 
 			response := rw.Result()
 			defer response.Body.Close()
@@ -208,9 +208,9 @@ func TestPostAPIHandler(t *testing.T) {
 
 			rw, req := sendRequest(http.MethodPost, args.BaseURL, strings.NewReader(tt.body))
 
-			linkShortener := shortener.New(mockRepository)
+			shortenerService := shortener.New(mockRepository)
 
-			New(linkShortener).PostAPI(rw, req)
+			New(shortenerService).PostAPI(rw, req)
 
 			response := rw.Result()
 			defer responseClose(t, response)
@@ -254,9 +254,9 @@ func TestPingHandler(t *testing.T) {
 			mockRepository.EXPECT().CheckHealth().Return(nil)
 
 			rw, req := sendRequest(http.MethodGet, args.BaseURL, strings.NewReader(tt.body))
-			linkShortener := shortener.New(mockRepository)
+			shortenerService := shortener.New(mockRepository)
 
-			New(linkShortener).Ping(rw, req)
+			New(shortenerService).Ping(rw, req)
 
 			response := rw.Result()
 			defer responseClose(t, response)
