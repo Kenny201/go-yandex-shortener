@@ -9,16 +9,19 @@ import (
 )
 
 var (
-	ErrParseBaseURL  = errors.New("failed to parse base url")
-	ErrSplitHostPort = errors.New("failed to split host and port")
+	ErrParseBaseURL  = errors.New("не удалось разобрать базовый URL")
+	ErrSplitHostPort = errors.New("не удалось разделить хост и порт")
 )
 
+// BaseURL представляет собой структуру URL с полями схема, хост и порт.
 type BaseURL struct {
 	scheme string
 	host   string
 	port   string
 }
 
+// NewBaseURL создает новый BaseURL из данной строки хоста.
+// Строка хоста должна быть в формате "scheme://host:port".
 func NewBaseURL(host string) (BaseURL, error) {
 	parsedURL, err := ParseBaseURL(host)
 
@@ -26,47 +29,43 @@ func NewBaseURL(host string) (BaseURL, error) {
 		return BaseURL{}, err
 	}
 
-	return BaseURL{parsedURL["scheme"], parsedURL["host"], parsedURL["port"]}, nil
+	return BaseURL{
+		scheme: parsedURL["scheme"],
+		host:   parsedURL["host"],
+		port:   parsedURL["port"],
+	}, nil
 }
 
-// ToString Преобразовать в строку формата: scheme://host:port
+// ToString возвращает BaseURL в виде строки в формате "scheme://host:port".
 func (bu BaseURL) ToString() string {
+	if bu.port == "" {
+		return fmt.Sprintf("%s://%s", bu.scheme, bu.host)
+	}
 	return fmt.Sprintf("%s://%s:%s", bu.scheme, bu.host, bu.port)
 }
 
-// Host Получить хост
-func (bu BaseURL) Host() string {
-	return bu.host
-}
-
-
-// Port Получить номер порта
-func (bu BaseURL) Port() string {
-	return bu.port
-}
-
-// ParseBaseURL Распарсить URL на схему, хост и порт
+// ParseBaseURL парсит переданную строку URL на компоненты схема, хост и порт.
+// Входная строка должна быть в формате "scheme://host:port" или "host:port".
 func ParseBaseURL(s string) (map[string]string, error) {
-	parsedURL := make(map[string]string, 3)
-	schemeAndHost := strings.Split(s, "://")
-	var host, port string
+	parsedURL := make(map[string]string)
 
-	// Если получили только хост без схемы,
-	// записываем в переменную строковый url с хостом без схемы для последующей выдачи ошибки
-	if len(schemeAndHost) == 1 {
-		s = fmt.Sprintf("://%s", schemeAndHost[0])
+	// Убедитесь, что строка URL имеет схему
+	if !strings.Contains(s, "://") {
+		s = "://" + s
 	}
 
 	u, err := url.Parse(s)
-
 	if err != nil {
-		return parsedURL, ErrParseBaseURL
+		return nil, ErrParseBaseURL
 	}
 
-	host, port, err = net.SplitHostPort(u.Host)
+	host, port, err := net.SplitHostPort(u.Host)
 
-	if err != nil {
-		return parsedURL, ErrSplitHostPort
+	if err != nil && err.Error() == "missing port" {
+		host = u.Host
+		port = ""
+	} else if err != nil {
+		return nil, ErrSplitHostPort
 	}
 
 	parsedURL["scheme"] = u.Scheme

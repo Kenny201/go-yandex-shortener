@@ -4,60 +4,48 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 )
 
+// Repository определяет интерфейс для работы с хранилищем сокращённых ссылок.
+// Реализации этого интерфейса могут быть на базе различных хранилищ данных (память, файл, база данных и т.д.).
 type Repository interface {
+	// Get возвращает URL-объект по его идентификатору (короткому ключу).
 	Get(id string) (*entity.URL, error)
+	// Create создает новый короткий URL и возвращает его.
 	Create(originalURL string) (string, error)
+	// CreateList создает несколько коротких URL и возвращает список созданных элементов.
 	CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error)
+	// CheckHealth проверяет состояние хранилища (доступность, целостность и т.д.).
 	CheckHealth() error
 }
 
+// Shortener представляет собой основной сервис для работы с сокращёнными ссылками.
+// Он использует репозиторий для сохранения и получения данных.
 type Shortener struct {
-	Repository Repository
+	repo Repository
 }
 
+// New создает новый экземпляр сервиса Shortener с заданным репозиторием.
 func New(repository Repository) *Shortener {
-	return &Shortener{Repository: repository}
+	return &Shortener{repo: repository}
 }
 
-// GetShortURL Получить сокращённую ссылку
+// GetShortURL возвращает сокращённую ссылку по короткому ключу или ошибку, если ссылка не найдена.
 func (s *Shortener) GetShortURL(shortKey string) (*entity.URL, error) {
-	result, err := s.Repository.Get(shortKey)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	return s.repo.Get(shortKey)
 }
 
-// CreateShortURL Сохранить url в хранилище.
-// Возвращает сокращённую ссылку
+// CreateShortURL сохраняет оригинальный URL в хранилище и возвращает сокращённую ссылку.
+// В случае ошибки возвращает пустую ссылку и ошибку.
 func (s *Shortener) CreateShortURL(originalURL string) (string, error) {
-	// Сохраняем ссылку в хранилище и получаем обратно
-	shortURL, err := s.Repository.Create(originalURL)
-
-	if err != nil {
-		return shortURL, err
-	}
-
-	return shortURL, nil
+	return s.repo.Create(originalURL)
 }
 
+// CreateListShortURL сохраняет список оригинальных URL в хранилище и возвращает список сокращённых ссылок.
+// В случае ошибки возвращает список частично созданных ссылок и ошибку.
 func (s *Shortener) CreateListShortURL(listURL []*entity.URLItem) ([]*entity.URLItem, error) {
-	// Сохраняем ссылку в хранилище и получаем обратно
-	urls, err := s.Repository.CreateList(listURL)
-
-	if err != nil {
-		return urls, err
-	}
-
-	return urls, nil
+	return s.repo.CreateList(listURL)
 }
 
+// CheckHealth проверяет состояние репозитория, с которым работает сервис.
 func (s *Shortener) CheckHealth() error {
-	if err := s.Repository.CheckHealth(); err != nil {
-		return err
-	}
-
-	return nil
+	return s.repo.CheckHealth()
 }

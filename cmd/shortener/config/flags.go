@@ -10,10 +10,10 @@ import (
 )
 
 const (
-	infoServerAddress   = "Server address host:port"
-	infoBaseURL         = "Result net address host:port"
-	infoFileStoragePath = "File storage path"
-	infoDatabaseDNS     = "Database DNS format: postgres://username:password@host:port/dbname?sslmode=disable"
+	infoServerAddress   = "Server address (host:port)"
+	infoBaseURL         = "Base URL (host:port)"
+	infoFileStoragePath = "Path to file storage"
+	infoDatabaseDNS     = "Database DNS (e.g., postgres://username:password@host:port/dbname?sslmode=disable)"
 )
 
 type Args struct {
@@ -25,72 +25,65 @@ type Args struct {
 }
 
 func NewArgs(config *Config) *Args {
-	args := &Args{}
-
-	args.config = config
-
-	return args
+	return &Args{
+		config: config,
+	}
 }
 
-// ParseFlags Парсинг переменных из командной строки
+// ParseFlags анализирует аргументы командной строки.
 func (a *Args) ParseFlags(args []string) {
-	defaultServerAddress := fmt.Sprintf(":%s", a.config.Port)
-	defaultBaseURL := fmt.Sprintf("http://localhost:%s", a.config.Port)
-
 	fs := flag.NewFlagSet("args", flag.ContinueOnError)
-	fs.StringVar(&a.ServerAddress, "a", defaultServerAddress, infoServerAddress)
-	fs.StringVar(&a.BaseURL, "b", defaultBaseURL, infoBaseURL)
+
+	fs.StringVar(&a.ServerAddress, "a", fmt.Sprintf(":%s", a.config.Port), infoServerAddress)
+	fs.StringVar(&a.BaseURL, "b", fmt.Sprintf("http://localhost:%s", a.config.Port), infoBaseURL)
 	fs.StringVar(&a.FileStoragePath, "f", "", infoFileStoragePath)
 	fs.StringVar(&a.DatabaseDNS, "d", "", infoDatabaseDNS)
-	fs.Parse(args)
 
-	a.setArgsFromEnv()
+	_ = fs.Parse(args) // Игнорировать ошибку, поскольку она обрабатывается флагом flag.ContinueOnError
+
+	a.overrideWithEnvVars()
 }
 
-// Установить аргументы из переменной окружения
-func (a *Args) setArgsFromEnv() {
-	if serverAddr := os.Getenv("SHORTENER_SERVER_ADDRESS"); serverAddr != "" {
-		a.ServerAddress = serverAddr
+// overrideWithEnvVars переопределяет аргументы переменными среды, если они установлены.
+func (a *Args) overrideWithEnvVars() {
+	if v := os.Getenv("SHORTENER_SERVER_ADDRESS"); v != "" {
+		a.ServerAddress = v
 	}
-
-	if baseURL := os.Getenv("SHORTENER_BASE_URL"); baseURL != "" {
-		a.BaseURL = baseURL
+	if v := os.Getenv("SHORTENER_BASE_URL"); v != "" {
+		a.BaseURL = v
 	}
-
-	if fileStoragePath := os.Getenv("FILE_STORAGE_PATH"); fileStoragePath != "" {
-		a.FileStoragePath = fileStoragePath
+	if v := os.Getenv("FILE_STORAGE_PATH"); v != "" {
+		a.FileStoragePath = v
 	}
-
-	if databaseDNS := os.Getenv("DATABASE_DSN"); databaseDNS != "" {
-		a.DatabaseDNS = databaseDNS
+	if v := os.Getenv("DATABASE_DSN"); v != "" {
+		a.DatabaseDNS = v
 	}
 }
 
+// InitRepository инициализирует соответствующий репозиторий на основе предоставленных аргументов.
 func (a *Args) InitRepository() (shortener.Repository, error) {
-	if a.DatabaseDNS != "" {
-		repository, err := storage.NewDatabaseShortenerRepository(a.BaseURL, a.DatabaseDNS)
-
+	switch {
+	case a.DatabaseDNS != "":
+		repo, err := storage.NewDatabaseShortenerRepository(a.BaseURL, a.DatabaseDNS)
 		if err != nil {
-			return nil, fmt.Errorf("repository database initialization error: %v", err)
+			return nil, fmt.Errorf("failed to initialize database repository: %w", err)
 		}
 
-		err = repository.Migrate()
-
-		if err != nil {
-			return nil, err
+		if err := repo.Migrate(); err != nil {
+			return nil, fmt.Errorf("failed to migrate database: %w", err)
 		}
 
-		return repository, nil
-	} else if a.FileStoragePath != "" {
-		repository, err := storage.NewFileShortenerRepository(a.BaseURL, a.FileStoragePath)
+		return repo, nil
 
+	case a.FileStoragePath != "":
+		repo, err := storage.NewFileShortenerRepository(a.BaseURL, a.FileStoragePath)
 		if err != nil {
-			return nil, fmt.Errorf("repository file initialization error: %v", err)
+			return nil, fmt.Errorf("failed to initialize file repository: %w", err)
 		}
 
-		return repository, nil
-	} else {
-		repository := storage.NewMemoryShortenerRepository(a.BaseURL)
-		return repository, nil
+		return repo, nil
+
+	default:
+		return storage.NewMemoryShortenerRepository(a.BaseURL), nil
 	}
 }

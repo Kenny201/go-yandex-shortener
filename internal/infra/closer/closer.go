@@ -6,37 +6,40 @@ import (
 	"sync"
 )
 
+// CL Глобальная переменная для хранения экземпляра Closer по умолчанию.
 var CL *Closer
 
+// closer определяет тип функции, принимающей контекст и возвращающей ошибку.
 type closer func(ctx context.Context) error
 
-// Closer is a helper to close multiple closers.
+// Closer управляет списком функций-closer и предоставляет методы для их закрытия.
 type Closer struct {
-	closers  []closer
-	mu       sync.Mutex
-	isDone   chan struct{}
-	isClosed bool
-	once     sync.Once
+	closers  []closer      // Список функций-closer для вызова при закрытии
+	mu       sync.Mutex    // Мьютекс для потокобезопасного доступа к списку closers
+	isDone   chan struct{} // Канал для уведомления о завершении закрытия
+	isClosed bool          // Флаг, указывающий, был ли Closer уже закрыт
+	once     sync.Once     // Объект sync.Once для однократного вызова функции
 }
 
-// New creates a new Closer.
+// New создает и возвращает новый экземпляр Closer.
 func New() *Closer {
 	cl := &Closer{
-		closers:  make([]closer, 0),
-		isDone:   make(chan struct{}),
-		isClosed: false,
+		closers:  []closer{},          // Инициализация пустого списка closer-ов
+		isDone:   make(chan struct{}), // Создание канала для уведомления о завершении
+		isClosed: false,               // Установка флага, что Closer еще не закрыт
 	}
 
-	CL = cl
+	CL = cl // Установка глобальной переменной на созданный экземпляр
 
 	return cl
 }
 
-// Add adds a closer to the Closer.
+// Add добавляет функцию-closer в список closers.
 func (c *Closer) Add(cl closer) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// Если Closer уже закрыт, новые closer-ы не добавляются
 	if c.isClosed {
 		return
 	}
@@ -44,36 +47,37 @@ func (c *Closer) Add(cl closer) {
 	c.closers = append(c.closers, cl)
 }
 
-// Done returns a channel that's closed when Close is called.
-func (c *Closer) Done() chan struct{} {
+// Done возвращает канал, который закрывается после вызова Close.
+func (c *Closer) Done() <-chan struct{} {
 	return c.isDone
 }
 
-// Close closes all closers.
+// Close вызывает все функции-closer в обратном порядке и возвращает собранные ошибки.
 func (c *Closer) Close(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// Если Closer уже закрыт, ничего не делаем
 	if c.isClosed {
 		return nil
 	}
 
 	c.isClosed = true
 
-	defer func() {
-		c.once.Do(func() {
-			close(c.isDone)
-		})
-	}()
+	// Закрытие канала isDone один раз
+	defer c.once.Do(func() {
+		close(c.isDone)
+	})
 
 	var resultErr []error
 
+	// Вызов функций-closer в обратном порядке
 	for i := len(c.closers) - 1; i >= 0; i-- {
-		fn := c.closers[i]
-		if err := fn(ctx); err != nil {
+		if err := c.closers[i](ctx); err != nil {
 			resultErr = append(resultErr, err)
 		}
 	}
 
+	// Объединение и возврат всех ошибок
 	return errors.Join(resultErr...)
 }
