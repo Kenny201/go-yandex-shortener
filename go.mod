@@ -8,6 +8,7 @@ require (
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/pkg/errors v0.9.1
+	github.com/golang/mock v1.6.0
 	github.com/spf13/viper v1.19.0
 )
 
