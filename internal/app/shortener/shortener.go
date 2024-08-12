@@ -36,7 +36,7 @@ func (s *Shortener) CreateShortURL(originalURL string) (string, error) {
 	shortURL, err := s.Repository.Create(originalURL)
 
 	if err != nil {
-		return "", err
+		return shortURL, err
 	}
 
 	return shortURL, nil

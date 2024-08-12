@@ -39,7 +39,7 @@ func (rm *MemoryShortenerRepository) Create(originalURL string) (string, error) 
 
 	//  Проверка существования записи в мапе urls.
 	if value, ok := rm.urls[originalURL]; ok {
-		return fmt.Sprintf("%s/%s", baseURL.ToString(), value.ShortKey), nil
+		return fmt.Sprintf("%s/%s", baseURL.ToString(), value.ShortKey), ErrorUrlAlreadyExist
 	}
 
 	shortURL := valueobject.NewShortURL(baseURL)
@@ -62,11 +62,14 @@ func (rm *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*enti
 	for _, v := range urls {
 		//  Проверка существования записи в мапе urls.
 		if v, ok := rm.urls[v.OriginalURL]; ok {
-			shortUrls = append(
-				shortUrls,
+			duplicateShortUrls := make([]*entity.URLItem, 0, len(urls))
+
+			duplicateShortUrls = append(
+				duplicateShortUrls,
 				&entity.URLItem{ID: v.ID, ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), v.ShortKey)},
 			)
-			continue
+
+			return duplicateShortUrls, ErrorUrlAlreadyExist
 		}
 
 		shortURL := valueobject.NewShortURL(baseURL)

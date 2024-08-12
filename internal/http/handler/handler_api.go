@@ -2,17 +2,19 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
 type (
 	ErrorResponse struct {
-		Code   int    `json:"code"`
-		Error  string `json:"error"`
-		Detail string `json:"detail,omitempty"`
+		Code   int         `json:"code"`
+		Error  string      `json:"error"`
+		Detail interface{} `json:"detail,omitempty"`
 	}
 
 	Request struct {
@@ -50,6 +52,11 @@ func (sh Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 	shortURL, err = sh.shortenerService.CreateShortURL(request.URL)
 
 	if err != nil {
+		if errors.Is(err, storage.ErrorUrlAlreadyExist) {
+			ErrorJSONResponse(w, http.StatusConflict, BadRequest, shortURL)
+			return
+		}
+
 		ErrorJSONResponse(w, http.StatusBadRequest, BadRequest, err.Error())
 		return
 	}
@@ -77,6 +84,11 @@ func (sh Handler) PostBatch(w http.ResponseWriter, r *http.Request) {
 	urls, err := sh.shortenerService.CreateListShortURL(requestBatch)
 
 	if err != nil {
+		if errors.Is(err, storage.ErrorUrlAlreadyExist) {
+			ErrorJSONResponse(w, http.StatusConflict, BadRequest, urls)
+			return
+		}
+
 		ErrorJSONResponse(w, http.StatusBadRequest, BadRequest, err.Error())
 		return
 	}
@@ -84,10 +96,10 @@ func (sh Handler) PostBatch(w http.ResponseWriter, r *http.Request) {
 	JSONResponse(w, http.StatusCreated, urls)
 }
 
-func ErrorJSONResponse(w http.ResponseWriter, code int, error string, message string) {
+func ErrorJSONResponse(w http.ResponseWriter, code int, error string, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(ErrorResponse{Code: code, Error: error, Detail: message})
+	json.NewEncoder(w).Encode(ErrorResponse{Code: code, Error: error, Detail: payload})
 }
 
 func JSONResponse(w http.ResponseWriter, statusCode int, payload interface{}) {

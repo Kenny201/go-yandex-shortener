@@ -8,7 +8,9 @@ import (
 	"log/slog"
 
 	"github.com/golang-migrate/migrate/v4"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -31,6 +33,8 @@ var (
 	ErrScanQuery           = fmt.Errorf("error scan query")
 	ErrCopyFrom            = fmt.Errorf("error copy from")
 	ErrCopyCount           = fmt.Errorf("error differences in the amount of data copied")
+	ErrorUrlAlreadyExist   = fmt.Errorf("duplicate key found")
+	pgErr                  *pgconn.PgError
 )
 
 type DatabaseShortenerRepository struct {
@@ -86,19 +90,10 @@ func (d *DatabaseShortenerRepository) Get(shortKey string) (*entity.URL, error) 
 }
 
 func (d *DatabaseShortenerRepository) Create(originalURL string) (string, error) {
-	url := entity.URL{}
 	baseURL, err := valueobject.NewBaseURL(d.baseURL)
 
 	if err != nil {
 		return "", err
-	}
-
-	value, err := d.checkExistsOriginalURL(originalURL)
-
-	if value == nil && err != nil {
-		return "", err
-	} else if value != nil {
-		return fmt.Sprintf("%s/%s", baseURL.ToString(), value.ShortKey), nil
 	}
 
 	shortURL := valueobject.NewShortURL(baseURL)
@@ -110,11 +105,15 @@ func (d *DatabaseShortenerRepository) Create(originalURL string) (string, error)
 		return "", fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrPrepareStatement, err.Error())
 	}
 
-	if err := d.DB.QueryRow(context.Background(), "insert_url", urlEntity.ID, urlEntity.ShortKey, urlEntity.OriginalURL).Scan(&url.ID, &url.ShortKey, &url.OriginalURL); err != nil { // scan will release the connection
+	if _, err = d.DB.Exec(context.Background(), "insert_url", urlEntity.ID, urlEntity.ShortKey, urlEntity.OriginalURL); err != nil {
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			return "", fmt.Errorf("%s, %w, %v func:Create", errInsertFailed, fmt.Errorf("%w for id: %s", ErrorUrlAlreadyExist, urlEntity.ID), err.Error())
+		}
+
 		return "", fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrScanQuery, err.Error())
 	}
 
-	return fmt.Sprintf("%s/%s", baseURL.ToString(), url.ShortKey), nil
+	return fmt.Sprintf("%s/%s", baseURL.ToString(), urlEntity.ShortKey), nil
 }
 
 func (d *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error) {
@@ -127,19 +126,7 @@ func (d *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*ent
 	}
 
 	for _, v := range urls {
-		value, err := d.checkExistsOriginalURL(v.OriginalURL)
 		shortURL := valueobject.NewShortURL(baseURL)
-
-		if value == nil && err != nil {
-			return nil, err
-		} else if value != nil {
-			shortUrls = append(
-				shortUrls, &entity.URLItem{ID: value.ID, ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), value.ShortKey)},
-			)
-
-			continue
-		}
-
 		linkedSubjects = append(linkedSubjects, []interface{}{v.ID, shortURL.ShortKey(), v.OriginalURL})
 
 		shortUrls = append(
@@ -155,34 +142,18 @@ func (d *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*ent
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrCopyFrom, err.Error())
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			return nil, fmt.Errorf("%s, %w, %v func:CreateList", errInsertFailed, fmt.Errorf("%w for id: %s", ErrorUrlAlreadyExist, linkedSubjects[copyCount][0]), err.Error())
+		}
+
+		return nil, fmt.Errorf("%s, %w, %v, func: CreateList", errInsertFailed, ErrCopyFrom, err.Error())
 	}
 
 	if int(copyCount) != len(linkedSubjects) {
-		return nil, fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrCopyCount, err.Error())
+		return nil, fmt.Errorf("%s, %w, %v, func: CreateList", errInsertFailed, ErrCopyCount, err.Error())
 	}
 
 	return shortUrls, nil
-}
-
-func (d *DatabaseShortenerRepository) checkExistsOriginalURL(originalURL string) (*entity.URL, error) {
-	url := &entity.URL{}
-
-	_, err := d.DB.Prepare(context.Background(), "select_url_by_original_url", "SELECT id, short_url, original_url FROM shorteners WHERE  original_url = $1")
-
-	if err != nil {
-		return nil, fmt.Errorf("%s, %w, %v func:checkExistsOriginalURL", errInsertFailed, ErrPrepareStatement, err.Error())
-	}
-
-	if err = d.DB.QueryRow(context.Background(), "select_url_by_original_url", originalURL).Scan(&url.ID, &url.ShortKey, &url.OriginalURL); err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("%s, %w, %v func:checkExistsOriginalURL", errInsertFailed, ErrScanQuery, err.Error())
-		}
-		// нет ошибок и не нашлось записей
-		return nil, nil
-	}
-
-	return url, nil
 }
 
 func (d *DatabaseShortenerRepository) close() error {
@@ -205,6 +176,7 @@ func (d *DatabaseShortenerRepository) Migrate() error {
 	if err != nil {
 		return ErrOpenMigrateFailed
 	}
+
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migration failed: %v Migrate", err.Error())
 	}
