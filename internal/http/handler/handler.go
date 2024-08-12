@@ -4,12 +4,10 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
-
-	"github.com/go-chi/chi/v5"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
+	"github.com/go-chi/chi/v5"
 )
 
 const (
@@ -72,17 +70,16 @@ func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
 
 	shortURL, err := h.shortenerService.CreateShortURL(string(body))
 
-	shortURL = strings.TrimSuffix(shortURL, "\r\n")
-
 	if err != nil {
 		if errors.Is(err, storage.ErrURLAlreadyExist) {
-			http.Error(w, shortURL, http.StatusConflict)
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(shortURL))
 			return
 		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
