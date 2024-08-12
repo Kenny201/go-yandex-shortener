@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
@@ -44,7 +45,7 @@ func (rm *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*enti
 	var shortUrls []*entity.URLItem
 
 	for _, urlItem := range urls {
-		if shortURL, err := rm.findOrCreateURL(urlItem.OriginalURL); err == ErrURLAlreadyExist {
+		if shortURL, err := rm.findOrCreateURL(urlItem.OriginalURL); errors.Is(err, ErrURLAlreadyExist) {
 			return []*entity.URLItem{{ID: urlItem.ID, ShortURL: shortURL}}, err
 		} else if err == nil {
 			shortUrls = append(shortUrls, &entity.URLItem{ID: urlItem.ID, ShortURL: shortURL})
