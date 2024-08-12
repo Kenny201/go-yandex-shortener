@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http/handler"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/closer"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/utils/closer"
 )
 
 const (

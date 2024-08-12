@@ -9,7 +9,7 @@ import (
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/closer"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/utils/closer"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/jackc/pgerrcode"
