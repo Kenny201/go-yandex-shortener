@@ -1,10 +1,8 @@
 package handler
 
 import (
-	"context"
 	"errors"
 	"io"
-	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -86,20 +84,11 @@ func (sh Handler) Post(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sh Handler) Ping(w http.ResponseWriter, r *http.Request) {
-	var value interface{} = sh.shortenerService.Repository
-
-	switch value.(type) {
-	case *storage.DatabaseShortenerRepository:
-		db := value.(*storage.DatabaseShortenerRepository).DB
-
-		if err := db.Ping(context.Background()); err != nil {
-			db.Close(context.Background())
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-
-		w.WriteHeader(http.StatusOK)
-	default:
-		slog.Error("Can't use this strategy to work with the database!")
-		w.WriteHeader(http.StatusInternalServerError)
+	if err := sh.shortenerService.CheckHealth(); err != nil {
+		http.Error(w, "Health check failed: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Pong"))
 }

@@ -8,6 +8,7 @@ type Repository interface {
 	Get(id string) (*entity.URL, error)
 	Create(originalURL string) (string, error)
 	CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error)
+	CheckHealth() error
 }
 
 type Shortener struct {
@@ -51,4 +52,12 @@ func (s *Shortener) CreateListShortURL(listURL []*entity.URLItem) ([]*entity.URL
 	}
 
 	return urls, nil
+}
+
+func (s *Shortener) CheckHealth() error {
+	if err := s.Repository.CheckHealth(); err != nil {
+		return err
+	}
+
+	return nil
 }

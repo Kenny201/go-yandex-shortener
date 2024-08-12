@@ -38,7 +38,7 @@ var (
 )
 
 type DatabaseShortenerRepository struct {
-	DB          *pgx.Conn
+	db          *pgx.Conn
 	databaseDNS string
 	baseURL     string
 }
@@ -56,7 +56,7 @@ func NewDatabaseShortenerRepository(baseURL string, databaseDNS string) (*Databa
 	}
 
 	d := &DatabaseShortenerRepository{
-		DB:          db,
+		db:          db,
 		databaseDNS: databaseDNS,
 		baseURL:     baseURL,
 	}
@@ -71,13 +71,13 @@ func NewDatabaseShortenerRepository(baseURL string, databaseDNS string) (*Databa
 func (d *DatabaseShortenerRepository) Get(shortKey string) (*entity.URL, error) {
 	url := entity.URL{}
 
-	_, err := d.DB.Prepare(context.Background(), "get_url", "SELECT id, short_url, original_url FROM shorteners WHERE  short_url = $1")
+	_, err := d.db.Prepare(context.Background(), "get_url", "SELECT id, short_url, original_url FROM shorteners WHERE  short_url = $1")
 
 	if err != nil {
 		return nil, fmt.Errorf("%s, %w, %v, func: Get", errGetByShortKey, ErrPrepareStatement, err.Error())
 	}
 
-	if err = d.DB.QueryRow(context.Background(), "get_url", shortKey).Scan(&url.ID, &url.ShortKey, &url.OriginalURL); err != nil {
+	if err = d.db.QueryRow(context.Background(), "get_url", shortKey).Scan(&url.ID, &url.ShortKey, &url.OriginalURL); err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("%s %w:%v,  func: Get", errGetByShortKey, ErrScanQuery, err.Error())
 		}
@@ -99,13 +99,13 @@ func (d *DatabaseShortenerRepository) Create(originalURL string) (string, error)
 	shortURL := valueobject.NewShortURL(baseURL)
 	urlEntity := entity.NewURL(originalURL, shortURL.ShortKey())
 
-	_, err = d.DB.Prepare(context.Background(), "insert_url", "INSERT INTO shorteners (id, short_url, original_url) values ($1, $2, $3) RETURNING id, short_url, original_url")
+	_, err = d.db.Prepare(context.Background(), "insert_url", "INSERT INTO shorteners (id, short_url, original_url) values ($1, $2, $3) RETURNING id, short_url, original_url")
 
 	if err != nil {
 		return "", fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrPrepareStatement, err.Error())
 	}
 
-	if _, err = d.DB.Exec(context.Background(), "insert_url", urlEntity.ID, urlEntity.ShortKey, urlEntity.OriginalURL); err != nil {
+	if _, err = d.db.Exec(context.Background(), "insert_url", urlEntity.ID, urlEntity.ShortKey, urlEntity.OriginalURL); err != nil {
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 			return "", fmt.Errorf("%s, %w, %v func:Create", errInsertFailed, fmt.Errorf("%w for id: %s", ErrorUrlAlreadyExist, urlEntity.ID), err.Error())
 		}
@@ -134,7 +134,7 @@ func (d *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*ent
 		)
 	}
 
-	copyCount, err := d.DB.CopyFrom(
+	copyCount, err := d.db.CopyFrom(
 		context.Background(),
 		pgx.Identifier{"shorteners"},
 		[]string{"id", "short_url", "original_url"},
@@ -157,7 +157,7 @@ func (d *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*ent
 }
 
 func (d *DatabaseShortenerRepository) close() error {
-	if err := d.DB.Close(context.Background()); err != nil {
+	if err := d.db.Close(context.Background()); err != nil {
 		slog.Error(ErrCloseDatabaseFailed.Error(), slog.String("Error:", err.Error()))
 		return err
 	} else {
@@ -181,5 +181,12 @@ func (d *DatabaseShortenerRepository) Migrate() error {
 		return fmt.Errorf("migration failed: %v Migrate", err.Error())
 	}
 
+	return nil
+}
+
+func (d *DatabaseShortenerRepository) CheckHealth() error {
+	if err := d.db.Ping(context.Background()); err != nil {
+		return fmt.Errorf("unable to ping database: %w", err)
+	}
 	return nil
 }
