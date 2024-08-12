@@ -18,7 +18,7 @@ var (
 )
 
 type DatabaseShortenerRepository struct {
-	DB          *sql.DB
+	db          *sql.DB
 	databaseDNS string
 	baseURL     string
 	closer      *closer.Closer
@@ -37,7 +37,7 @@ func NewDatabaseShortenerRepository(baseURL string, databaseDNS string, closer *
 	}
 
 	d := &DatabaseShortenerRepository{
-		DB:          db,
+		db:          db,
 		databaseDNS: databaseDNS,
 		baseURL:     baseURL,
 		closer:      closer,
@@ -75,12 +75,19 @@ func (d *DatabaseShortenerRepository) checkExistsOriginalURL(originalURL string)
 }
 
 func (d *DatabaseShortenerRepository) close() error {
-	if err := d.DB.Close(); err != nil {
+	if err := d.db.Close(); err != nil {
 		slog.Error(ErrCloseDatabaseFailed.Error(), slog.String("Error:", err.Error()))
 		return err
 	} else {
 		slog.Info("Db connection gracefully closed")
 	}
 
+	return nil
+}
+
+func (d *DatabaseShortenerRepository) CheckHealth() error {
+	if err := d.db.Ping(); err != nil {
+		return fmt.Errorf("unable to ping database: %w", err)
+	}
 	return nil
 }
