@@ -336,13 +336,15 @@ func getShortKeyFromShortedURL(t *testing.T, body io.ReadCloser) string {
 		t.Errorf("failed to read response body: %v", err.Error())
 	}
 
-	host, err = url.Parse(string(shortURL))
+	host, err = url.Parse(strings.TrimSuffix(string(shortURL), "\n"))
 
 	if err != nil {
 		t.Errorf("failed to parse url string: %v", err.Error())
 	}
 
-	shortKey := strings.TrimLeft(host.RequestURI(), "/")
+	if host != nil {
+		return strings.TrimLeft(host.RequestURI(), "/")
+	}
 
-	return shortKey
+	return ""
 }
