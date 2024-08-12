@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/closer"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
@@ -14,10 +17,6 @@ import (
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/closer"
 )
 
 const (
@@ -26,13 +25,12 @@ const (
 )
 
 var (
-	ErrOpenDatabaseFailed  = fmt.Errorf("unable to connect to database")
-	ErrCloseDatabaseFailed = fmt.Errorf("unable to close database connection")
-	ErrOpenMigrateFailed   = fmt.Errorf("unable to open Migrate files")
-	ErrPrepareStatement    = fmt.Errorf("error prepare statement")
-	ErrScanQuery           = fmt.Errorf("error scan query")
-	ErrCopyFrom            = fmt.Errorf("error copy from")
-	ErrCopyCount           = fmt.Errorf("error differences in the amount of data copied")
+	ErrOpenDatabaseFailed  = errors.New("unable to connect to database")
+	ErrCloseDatabaseFailed = errors.New("unable to close database connection")
+	ErrOpenMigrateFailed   = errors.New("unable to open migrate files")
+	ErrScanQuery           = errors.New("error scan query")
+	ErrCopyFrom            = errors.New("error copy from")
+	ErrCopyCount           = errors.New("error differences in the amount of data copied")
 	ErrorUrlAlreadyExist   = fmt.Errorf("duplicate key found")
 	pgErr                  *pgconn.PgError
 )
@@ -43,29 +41,29 @@ type DatabaseShortenerRepository struct {
 	baseURL     string
 }
 
-func NewDatabaseShortenerRepository(baseURL string, databaseDNS string) (*DatabaseShortenerRepository, error) {
+func NewDatabaseShortenerRepository(baseURL, databaseDNS string) (*DatabaseShortenerRepository, error) {
 	db, err := pgx.Connect(context.Background(), databaseDNS)
 
 	if err != nil {
 		return nil, ErrOpenDatabaseFailed
 	}
 
-	if db.Ping(context.Background()) != nil {
+	if err := db.Ping(context.Background()); err != nil {
 		db.Close(context.Background())
 		return nil, ErrOpenDatabaseFailed
 	}
 
-	d := &DatabaseShortenerRepository{
+	repo := &DatabaseShortenerRepository{
 		db:          db,
 		databaseDNS: databaseDNS,
 		baseURL:     baseURL,
 	}
 
 	closer.CL.Add(func(ctx context.Context) error {
-		return d.close()
+		return repo.close()
 	})
 
-	return d, nil
+	return repo, nil
 }
 
 func (d *DatabaseShortenerRepository) Get(shortKey string) (*entity.URL, error) {
@@ -158,27 +156,23 @@ func (d *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*ent
 
 func (d *DatabaseShortenerRepository) close() error {
 	if err := d.db.Close(context.Background()); err != nil {
-		slog.Error(ErrCloseDatabaseFailed.Error(), slog.String("Error:", err.Error()))
+		slog.Error(ErrCloseDatabaseFailed.Error(), slog.String("Error", err.Error()))
 		return err
-	} else {
-		slog.Info("Db connection gracefully closed")
 	}
 
+	slog.Info("Db connection gracefully closed")
 	return nil
 }
 
 func (d *DatabaseShortenerRepository) Migrate() error {
-	m, err := migrate.New(
-		"file://internal/migrations",
-		d.databaseDNS,
-	)
+	m, err := migrate.New("file://internal/migrations", d.databaseDNS)
 
 	if err != nil {
 		return ErrOpenMigrateFailed
 	}
 
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return fmt.Errorf("migration failed: %v Migrate", err.Error())
+		return fmt.Errorf("migration failed: %v", err)
 	}
 
 	return nil
