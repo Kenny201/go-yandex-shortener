@@ -52,7 +52,7 @@ func (sh Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 	shortURL, err = sh.shortenerService.CreateShortURL(request.URL)
 
 	if err != nil {
-		if errors.Is(err, storage.ErrorUrlAlreadyExist) {
+		if errors.Is(err, storage.ErrUrlAlreadyExist) {
 			ErrorJSONResponse(w, http.StatusConflict, BadRequest, shortURL)
 			return
 		}
@@ -84,7 +84,7 @@ func (sh Handler) PostBatch(w http.ResponseWriter, r *http.Request) {
 	urls, err := sh.shortenerService.CreateListShortURL(requestBatch)
 
 	if err != nil {
-		if errors.Is(err, storage.ErrorUrlAlreadyExist) {
+		if errors.Is(err, storage.ErrUrlAlreadyExist) {
 			ErrorJSONResponse(w, http.StatusConflict, BadRequest, urls)
 			return
 		}

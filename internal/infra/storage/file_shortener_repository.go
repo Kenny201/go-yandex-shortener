@@ -70,7 +70,7 @@ func (file *FileShortenerRepository) Create(originalURL string) (string, error) 
 
 	// Если запись существует повторную запись не производим
 	if v, ok := file.urls[originalURL]; ok {
-		return fmt.Sprintf("%s/%s", baseURL.ToString(), v.ShortKey), ErrorUrlAlreadyExist
+		return fmt.Sprintf("%s/%s", baseURL.ToString(), v.ShortKey), ErrUrlAlreadyExist
 	}
 
 	shortURL := valueobject.NewShortURL(baseURL)
@@ -114,7 +114,7 @@ func (file *FileShortenerRepository) CreateList(urls []*entity.URLItem) ([]*enti
 				&entity.URLItem{ID: v.ID, ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), url.ShortKey)},
 			)
 
-			return duplicateShortUrls, ErrorUrlAlreadyExist
+			return duplicateShortUrls, ErrUrlAlreadyExist
 		}
 
 		shortURL := valueobject.NewShortURL(baseURL)

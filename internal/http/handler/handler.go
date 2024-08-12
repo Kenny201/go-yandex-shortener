@@ -69,7 +69,7 @@ func (sh Handler) Post(w http.ResponseWriter, r *http.Request) {
 	shortURL, err = sh.shortenerService.CreateShortURL(string(body))
 
 	if err != nil {
-		if errors.Is(err, storage.ErrorUrlAlreadyExist) {
+		if errors.Is(err, storage.ErrUrlAlreadyExist) {
 			http.Error(w, shortURL, http.StatusConflict)
 			return
 		}

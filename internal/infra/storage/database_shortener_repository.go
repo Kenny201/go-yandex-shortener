@@ -30,9 +30,8 @@ var (
 	ErrOpenMigrateFailed   = errors.New("unable to open migrate files")
 	ErrScanQuery           = errors.New("error scan query")
 	ErrCopyFrom            = errors.New("error copy from")
-	ErrCopyCount           = errors.New("error differences in the amount of data copied")
-	ErrorUrlAlreadyExist   = fmt.Errorf("duplicate key found")
-	pgErr                  *pgconn.PgError
+	ErrCopyCount           = errors.New("differences in the amount of data copied")
+	ErrUrlAlreadyExist     = errors.New("duplicate key found")
 )
 
 type DatabaseShortenerRepository struct {
@@ -43,13 +42,10 @@ type DatabaseShortenerRepository struct {
 
 func NewDatabaseShortenerRepository(baseURL, databaseDNS string) (*DatabaseShortenerRepository, error) {
 	db, err := pgx.Connect(context.Background(), databaseDNS)
-
-	if err != nil {
-		return nil, ErrOpenDatabaseFailed
-	}
-
-	if err := db.Ping(context.Background()); err != nil {
-		db.Close(context.Background())
+	if err != nil || db.Ping(context.Background()) != nil {
+		if db != nil {
+			db.Close(context.Background())
+		}
 		return nil, ErrOpenDatabaseFailed
 	}
 
@@ -59,32 +55,22 @@ func NewDatabaseShortenerRepository(baseURL, databaseDNS string) (*DatabaseShort
 		baseURL:     baseURL,
 	}
 
-	closer.CL.Add(func(ctx context.Context) error {
-		return repo.close()
-	})
-
+	closer.CL.Add(repo.close)
 	return repo, nil
 }
 
 func (d *DatabaseShortenerRepository) Get(shortKey string) (*entity.URL, error) {
-	url := entity.URL{}
+	query := "SELECT id, short_url, original_url FROM shorteners WHERE short_url = $1"
+	url := &entity.URL{}
 
-	_, err := d.db.Prepare(context.Background(), "get_url", "SELECT id, short_url, original_url FROM shorteners WHERE  short_url = $1")
-
-	if err != nil {
-		return nil, fmt.Errorf("%s, %w, %v, func: Get", errGetByShortKey, ErrPrepareStatement, err.Error())
-	}
-
-	if err = d.db.QueryRow(context.Background(), "get_url", shortKey).Scan(&url.ID, &url.ShortKey, &url.OriginalURL); err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("%s %w:%v,  func: Get", errGetByShortKey, ErrScanQuery, err.Error())
+	if err := d.db.QueryRow(context.Background(), query, shortKey).Scan(&url.ID, &url.ShortKey, &url.OriginalURL); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("url %v not found: %w", shortKey, errGetByShortKey)
 		}
-
-		// нет ошибок и не нашлось записей
-		return nil, fmt.Errorf("url %v not found, func: Get", shortKey)
+		return nil, fmt.Errorf("%s: %w, func: Get", errGetByShortKey, ErrScanQuery)
 	}
 
-	return &url, nil
+	return url, nil
 }
 
 func (d *DatabaseShortenerRepository) Create(originalURL string) (string, error) {
@@ -97,40 +83,23 @@ func (d *DatabaseShortenerRepository) Create(originalURL string) (string, error)
 	shortURL := valueobject.NewShortURL(baseURL)
 	urlEntity := entity.NewURL(originalURL, shortURL.ShortKey())
 
-	_, err = d.db.Prepare(context.Background(), "insert_url", "INSERT INTO shorteners (id, short_url, original_url) values ($1, $2, $3) RETURNING id, short_url, original_url")
+	query := "INSERT INTO shorteners (id, short_url, original_url) values ($1, $2, $3)"
 
-	if err != nil {
-		return "", fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrPrepareStatement, err.Error())
-	}
-
-	if _, err = d.db.Exec(context.Background(), "insert_url", urlEntity.ID, urlEntity.ShortKey, urlEntity.OriginalURL); err != nil {
-		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-			return "", fmt.Errorf("%s, %w, %v func:Create", errInsertFailed, fmt.Errorf("%w for id: %s", ErrorUrlAlreadyExist, urlEntity.ID), err.Error())
-		}
-
-		return "", fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrScanQuery, err.Error())
+	if _, err := d.db.Exec(context.Background(), query, urlEntity.ID, urlEntity.ShortKey, urlEntity.OriginalURL); err != nil {
+		return d.handleInsertError(err, urlEntity.ID)
 	}
 
 	return fmt.Sprintf("%s/%s", baseURL.ToString(), urlEntity.ShortKey), nil
 }
 
 func (d *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error) {
-	shortUrls := make([]*entity.URLItem, 0, len(urls))
-	var linkedSubjects [][]interface{}
 	baseURL, err := valueobject.NewBaseURL(d.baseURL)
 
 	if err != nil {
 		return nil, err
 	}
 
-	for _, v := range urls {
-		shortURL := valueobject.NewShortURL(baseURL)
-		linkedSubjects = append(linkedSubjects, []interface{}{v.ID, shortURL.ShortKey(), v.OriginalURL})
-
-		shortUrls = append(
-			shortUrls, &entity.URLItem{ID: v.ID, ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), shortURL.ShortKey())},
-		)
-	}
+	linkedSubjects, shortUrls := d.prepareInsertData(urls, baseURL)
 
 	copyCount, err := d.db.CopyFrom(
 		context.Background(),
@@ -139,28 +108,49 @@ func (d *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*ent
 		pgx.CopyFromRows(linkedSubjects),
 	)
 
-	if err != nil {
-		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-			return nil, fmt.Errorf("%s, %w, %v func:CreateList", errInsertFailed, fmt.Errorf("%w for id: %s", ErrorUrlAlreadyExist, linkedSubjects[copyCount][0]), err.Error())
-		}
-
-		return nil, fmt.Errorf("%s, %w, %v, func: CreateList", errInsertFailed, ErrCopyFrom, err.Error())
-	}
-
-	if int(copyCount) != len(linkedSubjects) {
-		return nil, fmt.Errorf("%s, %w, %v, func: CreateList", errInsertFailed, ErrCopyCount, err.Error())
+	if err != nil || int(copyCount) != len(linkedSubjects) {
+		return nil, d.handleCopyError(err, copyCount, linkedSubjects)
 	}
 
 	return shortUrls, nil
 }
 
-func (d *DatabaseShortenerRepository) close() error {
-	if err := d.db.Close(context.Background()); err != nil {
+func (d *DatabaseShortenerRepository) prepareInsertData(urls []*entity.URLItem, baseURL valueobject.BaseURL) ([][]interface{}, []*entity.URLItem) {
+	var linkedSubjects [][]interface{}
+	shortUrls := make([]*entity.URLItem, 0, len(urls))
+
+	for _, v := range urls {
+		shortURL := valueobject.NewShortURL(baseURL)
+		linkedSubjects = append(linkedSubjects, []interface{}{v.ID, shortURL.ShortKey(), v.OriginalURL})
+		shortUrls = append(shortUrls, &entity.URLItem{ID: v.ID, ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), shortURL.ShortKey())})
+	}
+
+	return linkedSubjects, shortUrls
+}
+
+func (d *DatabaseShortenerRepository) handleInsertError(err error, id string) (string, error) {
+	if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == pgerrcode.UniqueViolation {
+		return "", fmt.Errorf("%w for id: %s", ErrUrlAlreadyExist, id)
+	}
+	return "", fmt.Errorf("%s: %w", errInsertFailed, err)
+}
+
+func (d *DatabaseShortenerRepository) handleCopyError(err error, copyCount int64, linkedSubjects [][]interface{}) error {
+	if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == pgerrcode.UniqueViolation {
+		return fmt.Errorf("%w for id: %s", ErrUrlAlreadyExist, linkedSubjects[copyCount][0])
+	}
+	if int(copyCount) != len(linkedSubjects) {
+		return fmt.Errorf("%w: %d rows copied, expected %d", ErrCopyCount, copyCount, len(linkedSubjects))
+	}
+	return fmt.Errorf("%w: %v", ErrCopyFrom, err)
+}
+
+func (d *DatabaseShortenerRepository) close(ctx context.Context) error {
+	if err := d.db.Close(ctx); err != nil {
 		slog.Error(ErrCloseDatabaseFailed.Error(), slog.String("Error", err.Error()))
 		return err
 	}
-
-	slog.Info("Db connection gracefully closed")
+	slog.Info("Database connection gracefully closed")
 	return nil
 }
 
