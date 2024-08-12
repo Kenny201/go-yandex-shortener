@@ -191,7 +191,7 @@ func (d *DatabaseShortenerRepository) close(ctx context.Context) error {
 
 // Migrate выполняет миграцию базы данных.
 func (d *DatabaseShortenerRepository) Migrate() error {
-	m, err := migrate.New("file://../../internal/migrations", d.databaseDNS)
+	m, err := migrate.New("file://internal/migrations", d.databaseDNS)
 	if err != nil {
 		return ErrOpenMigrateFailed
 	}
