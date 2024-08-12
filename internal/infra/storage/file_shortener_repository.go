@@ -208,3 +208,10 @@ func (file *FileShortenerRepository) close(f *os.File) {
 		)
 	}
 }
+
+func (file *FileShortenerRepository) CheckHealth() error {
+	if _, err := os.Stat(file.filePath); os.IsNotExist(err) {
+		return fmt.Errorf("file does not exist: %w", err)
+	}
+	return nil
+}

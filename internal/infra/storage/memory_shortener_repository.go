@@ -84,3 +84,10 @@ func (rm *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*enti
 
 	return shortUrls, nil
 }
+
+func (rm *MemoryShortenerRepository) CheckHealth() error {
+	if rm.urls == nil {
+		return fmt.Errorf("memory urls structure is not initialized")
+	}
+	return nil
+}
