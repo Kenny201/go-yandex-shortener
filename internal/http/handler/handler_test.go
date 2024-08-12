@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 
@@ -20,9 +19,8 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/internal/mocks"
 )
 
+// TestPostHandler тестирует обработчик создания короткого URL
 func TestPostHandler(t *testing.T) {
-	var args = initArgs(t)
-
 	tests := []struct {
 		name                    string
 		body                    string
@@ -54,56 +52,57 @@ func TestPostHandler(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			// Создаем mock для интерфейса DB
+			// Создаем mock для интерфейса Repository
 			mockRepository := mocks.NewMockRepository(ctrl)
 
-			mockRepository.EXPECT().Create(tt.body).Return("some-short-url", nil)
+			// Ожидание вызова Create только в случае валидного тела запроса
+			if tt.wantStatusCode == http.StatusCreated {
+				mockRepository.EXPECT().Create(tt.body).Return("some-short-url", nil)
+			}
 
-			rw, r := sendRequest(http.MethodPost, args.BaseURL, strings.NewReader(tt.body))
+			rw, r := sendRequest(http.MethodPost, "/", strings.NewReader(tt.body))
 			linkShortener := shortener.New(mockRepository)
 			New(linkShortener).Post(rw, r)
 
 			response := rw.Result()
-			defer responseClose(t, response)
+			defer response.Body.Close()
 
 			if response.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
+				t.Errorf("expected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
 			}
 
 			if response.Header.Get("Content-Type") != tt.wantResponseContentType {
-				t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
+				t.Errorf("response content type header does not match: got %v want %v",
 					response.Header.Get("Content-Type"), tt.wantResponseContentType)
 			}
 		})
-
 	}
 }
 
+// TestGetHandler тестирует обработчик получения оригинального URL по короткому ключу
 func TestGetHandler(t *testing.T) {
 	var args = initArgs(t)
 
 	tests := []struct {
 		name               string
-		body               string
 		id                 string
 		wantLocationHeader string
 		wantStatusCode     int
 	}{
 		{
-			name:               "redirect_for_body_https://yandex.ru",
-			body:               "https://yandex.ru",
+			name:               "redirect_for_existing_short_url_yandex",
+			id:                 "some-short-url",
 			wantLocationHeader: "https://yandex.ru",
 			wantStatusCode:     http.StatusTemporaryRedirect,
 		},
 		{
-			name:               "redirect_for_body_https://practicum.yandex.ru",
-			body:               "https://practicum.yandex.ru",
+			name:               "redirect_for_existing_short_url_practicum",
+			id:                 "some-short-url-practicum",
 			wantLocationHeader: "https://practicum.yandex.ru",
 			wantStatusCode:     http.StatusTemporaryRedirect,
 		},
 		{
 			name:           "id_not_found",
-			body:           "https://yandex.ru",
 			id:             "nonexistent-id",
 			wantStatusCode: http.StatusNotFound,
 		},
@@ -117,43 +116,26 @@ func TestGetHandler(t *testing.T) {
 			// Создаем mock для интерфейса Repository
 			mockRepository := mocks.NewMockRepository(ctrl)
 
-			var shortURL string
 			if tt.wantStatusCode != http.StatusNotFound {
-				// Ожидаем, что метод Create вернет короткий URL
-				shortURL = "some-short-url"
-				mockRepository.EXPECT().Create(tt.body).Return("http://localhost::8080/"+shortURL, nil)
-				fmt.Println(shortURL)
-
 				// Ожидаем, что метод Get вернет сущность URL с исходным URL
-				mockRepository.EXPECT().Get(shortURL).Return(&entity.URL{
+				mockRepository.EXPECT().Get(tt.id).Return(&entity.URL{
 					ID:          "some-id",
-					ShortKey:    shortURL,
-					OriginalURL: tt.body,
+					ShortKey:    tt.id,
+					OriginalURL: tt.wantLocationHeader,
 				}, nil)
 			} else {
 				// Ожидаем, что метод Get вернет ошибку "not found"
 				mockRepository.EXPECT().Get(tt.id).Return(nil, fmt.Errorf("not found"))
 			}
 
-			// Отправляем запрос на создание короткого URL
-			rw, req := sendRequest(http.MethodPost, "http://localhost"+args.ServerAddress, strings.NewReader(tt.body))
+			rw, req := sendRequest(http.MethodGet, args.BaseURL, nil)
+			req = withURLParam(req, "id", tt.id)
+
 			linkShortener := shortener.New(mockRepository)
-			New(linkShortener).PostAPI(rw, req)
-
-			// Получаем результат создания
-			createResponse := rw.Result()
-			defer responseClose(t, createResponse)
-
-			if createResponse.StatusCode != http.StatusCreated {
-				t.Errorf("expected status: got %v want %v", createResponse.StatusCode, http.StatusCreated)
-			}
-
-			// Теперь отправляем запрос на получение созданного короткого URL
-			rw, req = sendRequest(http.MethodGet, "http://localhost"+args.ServerAddress+"/some-short-url", nil)
 			New(linkShortener).Get(rw, req)
 
 			response := rw.Result()
-			defer responseClose(t, response)
+			defer response.Body.Close()
 
 			if response.StatusCode != tt.wantStatusCode {
 				t.Errorf("expected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
@@ -166,7 +148,6 @@ func TestGetHandler(t *testing.T) {
 				}
 			}
 		})
-
 	}
 }
 
@@ -331,27 +312,4 @@ func withURLParam(r *http.Request, key, value string) *http.Request {
 	req := r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, chiCtx))
 	chiCtx.URLParams.Add(key, value)
 	return req
-}
-
-func getShortKeyFromShortedURL(t *testing.T, body io.ReadCloser) string {
-	t.Helper()
-	var host *url.URL
-
-	shortURL, err := io.ReadAll(body)
-
-	if err != nil {
-		t.Errorf("failed to read response body: %v", err.Error())
-	}
-
-	host, err = url.Parse(strings.TrimSuffix(string(shortURL), "\n"))
-
-	if err != nil {
-		t.Errorf("failed to parse url string: %v", err.Error())
-	}
-
-	if host != nil {
-		return strings.TrimLeft(host.RequestURI(), "/")
-	}
-
-	return ""
 }
