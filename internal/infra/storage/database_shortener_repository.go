@@ -155,11 +155,11 @@ func (d *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*ent
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrCopyFrom, err.Error())
+		return []*entity.URLItem{}, fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrCopyFrom, err.Error())
 	}
 
 	if int(copyCount) != len(linkedSubjects) {
-		return nil, fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrCopyCount, err.Error())
+		return []*entity.URLItem{}, fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrCopyCount, err.Error())
 	}
 
 	return shortUrls, nil
