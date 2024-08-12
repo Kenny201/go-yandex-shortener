@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	ErrParseBaseURL  = errors.New("не удалось разобрать базовый URL")
-	ErrSplitHostPort = errors.New("не удалось разделить хост и порт")
+	ErrParseBaseURL  = errors.New("failed to parse base url")
+	ErrSplitHostPort = errors.New("failed to split host and port")
 )
 
 // BaseURL представляет собой структуру URL с полями схема, хост и порт.
