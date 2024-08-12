@@ -32,7 +32,7 @@ var (
 )
 
 type DatabaseShortenerRepository struct {
-	DB          *sql.DB
+	db          *sql.DB
 	databaseDNS string
 	baseURL     string
 }
@@ -50,7 +50,7 @@ func NewDatabaseShortenerRepository(baseURL string, databaseDNS string) (*Databa
 	}
 
 	d := &DatabaseShortenerRepository{
-		DB:          db,
+		db:          db,
 		databaseDNS: databaseDNS,
 		baseURL:     baseURL,
 	}
@@ -81,7 +81,7 @@ func (d *DatabaseShortenerRepository) Create(originalURL string) (string, error)
 	shortURL := valueobject.NewShortURL(baseURL)
 	urlEntity := entity.NewURL(originalURL, shortURL.ShortKey())
 
-	stmt, err := d.DB.Prepare("INSERT INTO shorteners (short_url, original_url) values ($1, $2) RETURNING id, short_url, original_url")
+	stmt, err := d.db.Prepare("INSERT INTO shorteners (short_url, original_url) values ($1, $2) RETURNING id, short_url, original_url")
 
 	if err != nil {
 		return "", fmt.Errorf("%s, %w, %v, func: Create", errInsertFailed, ErrPrepareStatement, err.Error())
@@ -97,7 +97,7 @@ func (d *DatabaseShortenerRepository) Create(originalURL string) (string, error)
 func (d *DatabaseShortenerRepository) Get(shortKey string) (*entity.URL, error) {
 	url := &entity.URL{}
 
-	stmt, err := d.DB.Prepare("SELECT id, short_url, original_url FROM shorteners WHERE  short_url = $1")
+	stmt, err := d.db.Prepare("SELECT id, short_url, original_url FROM shorteners WHERE  short_url = $1")
 
 	if err != nil {
 		return nil, fmt.Errorf("%s, %w, %v, func: Get", errGetByShortKey, ErrPrepareStatement, err.Error())
@@ -124,7 +124,7 @@ func (d *DatabaseShortenerRepository) GetAll() map[string]*entity.URL {
 func (d *DatabaseShortenerRepository) checkExistsOriginalURL(originalURL string) (*entity.URL, error) {
 	url := &entity.URL{}
 
-	stmt, err := d.DB.Prepare("SELECT id, short_url, original_url FROM shorteners WHERE  original_url = $1")
+	stmt, err := d.db.Prepare("SELECT id, short_url, original_url FROM shorteners WHERE  original_url = $1")
 
 	if err != nil {
 		return nil, fmt.Errorf("%s, %w, %v func:checkExistsOriginalURL", errInsertFailed, ErrPrepareStatement, err.Error())
@@ -142,7 +142,7 @@ func (d *DatabaseShortenerRepository) checkExistsOriginalURL(originalURL string)
 }
 
 func (d *DatabaseShortenerRepository) close() error {
-	if err := d.DB.Close(); err != nil {
+	if err := d.db.Close(); err != nil {
 		slog.Error(ErrCloseDatabaseFailed.Error(), slog.String("Error:", err.Error()))
 		return err
 	} else {
@@ -166,5 +166,12 @@ func (d *DatabaseShortenerRepository) Migrate() error {
 		return fmt.Errorf("migration failed: %v Migrate", err.Error())
 	}
 
+	return nil
+}
+
+func (d *DatabaseShortenerRepository) CheckHealth() error {
+	if err := d.db.Ping(); err != nil {
+		return fmt.Errorf("unable to ping database: %w", err)
+	}
 	return nil
 }

@@ -67,3 +67,10 @@ func (rm *MemoryShortenerRepository) checkExistsOriginalURL(originalURL string) 
 
 	return nil, false
 }
+
+func (rm *MemoryShortenerRepository) CheckHealth() error {
+	if rm.urls == nil {
+		return fmt.Errorf("memory urls structure is not initialized")
+	}
+	return nil
+}

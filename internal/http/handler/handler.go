@@ -3,13 +3,11 @@ package handler
 import (
 	"errors"
 	"io"
-	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
 const (
@@ -80,20 +78,11 @@ func (sh Handler) Post(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sh Handler) Ping(w http.ResponseWriter, r *http.Request) {
-	var value interface{} = sh.shortenerService.Repository
-
-	switch value.(type) {
-	case *storage.DatabaseShortenerRepository:
-		db := value.(*storage.DatabaseShortenerRepository).DB
-
-		if err := db.Ping(); err != nil {
-			db.Close()
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-
-		w.WriteHeader(http.StatusOK)
-	default:
-		slog.Error("Can't use this strategy to work with the database!")
-		w.WriteHeader(http.StatusInternalServerError)
+	if err := sh.shortenerService.CheckHealth(); err != nil {
+		http.Error(w, "Health check failed: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Pong"))
 }
