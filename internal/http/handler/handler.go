@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -70,6 +71,8 @@ func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	shortURL, err := h.shortenerService.CreateShortURL(string(body))
+
+	shortURL = strings.TrimSuffix(shortURL, "\r\n")
 
 	if err != nil {
 		if errors.Is(err, storage.ErrURLAlreadyExist) {
