@@ -17,7 +17,6 @@ import (
 func main() {
 	closer.New()
 	conf, err := config.LoadConfig("./")
-	var linkShortener *shortener.Shortener
 
 	if err != nil {
 		slog.Error("error read config %v", slog.String("error", err.Error()))
@@ -37,9 +36,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	linkShortener = shortener.New(repository)
+	shortenerService := shortener.New(repository)
 
-	urlHandler := handler.New(linkShortener)
+	urlHandler := handler.New(shortenerService)
 
 	http.NewServer(ctx, args.ServerAddress, urlHandler).Start()
 }
