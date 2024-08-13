@@ -24,7 +24,6 @@ var (
 	ErrOpenDatabaseFailed  = errors.New("unable to connect to database")
 	ErrCloseDatabaseFailed = errors.New("unable to close database connection")
 	ErrOpenMigrateFailed   = errors.New("unable to open migrate files")
-	ErrScanQuery           = errors.New("error scan query")
 	ErrCopyFrom            = errors.New("error copy from")
 	ErrCopyCount           = errors.New("differences in the amount of data copied")
 	ErrURLAlreadyExist     = errors.New("duplicate key found")
@@ -64,9 +63,9 @@ func (d *DatabaseShortenerRepository) Get(shortKey string) (*entity.URL, error) 
 	err := d.db.QueryRow(context.Background(), query, shortKey).Scan(&url.ID, &url.ShortKey, &url.OriginalURL)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("url %v не найден: %w", shortKey, ErrScanQuery)
+			return nil, fmt.Errorf("URL %v not found", shortKey)
 		}
-		return nil, fmt.Errorf("%w, func: Get", ErrScanQuery)
+		return nil, fmt.Errorf("error when executing the request: %w", err)
 	}
 
 	slog.Info("URL retrieved", slog.String("shortKey", shortKey), slog.String("originalURL", url.OriginalURL))
@@ -85,20 +84,26 @@ func (d *DatabaseShortenerRepository) Create(originalURL string) (string, error)
 
 	query := "INSERT INTO shorteners (id, short_url, original_url) VALUES ($1, $2, $3)"
 	_, err = d.db.Exec(context.Background(), query, urlEntity.ID, urlEntity.ShortKey, urlEntity.OriginalURL)
-	if err != nil {
-		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-			existingShortKey, err := d.getShortKeyByOriginalURL(originalURL)
-			if err != nil {
-				return "", fmt.Errorf("%w", err)
-			}
-			return fmt.Sprintf("%s/%s", baseURL.ToString(), existingShortKey), ErrURLAlreadyExist
-		}
-		return "", fmt.Errorf("%w", err)
+
+	if err == nil {
+		shortURLStr := fmt.Sprintf("%s/%s", baseURL.ToString(), urlEntity.ShortKey)
+		slog.Info("URL created", slog.String("originalURL", originalURL), slog.String("shortURL", shortURLStr))
+		return shortURLStr, nil
 	}
 
-	shortURLStr := fmt.Sprintf("%s/%s", baseURL.ToString(), urlEntity.ShortKey)
-	slog.Info("URL created", slog.String("originalURL", originalURL), slog.String("shortURL", shortURLStr))
-	return shortURLStr, nil
+	// Обработка ошибки уникальности
+	if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+		existingShortKey, err := d.getShortKeyByOriginalURL(originalURL)
+
+		if err != nil {
+			return "", fmt.Errorf("%w", err)
+		}
+
+		return fmt.Sprintf("%s/%s", baseURL.ToString(), existingShortKey), ErrURLAlreadyExist
+	}
+
+	// Возврат других ошибок
+	return "", fmt.Errorf("%w", err)
 }
 
 // getShortKeyByOriginalURL возвращает существующий короткий ключ для заданного оригинального URL.
