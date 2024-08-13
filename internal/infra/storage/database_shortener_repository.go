@@ -86,9 +86,9 @@ func (d *DatabaseShortenerRepository) Create(originalURL string) (string, error)
 	_, err = d.db.Exec(context.Background(), query, urlEntity.ID, urlEntity.ShortKey, urlEntity.OriginalURL)
 	if err != nil {
 		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == pgerrcode.UniqueViolation {
-			existingShortKey, getErr := d.getShortKeyByOriginalURL(originalURL)
-			if getErr != nil {
-				return "", fmt.Errorf("%w", getErr)
+			existingShortKey, err := d.getShortKeyByOriginalURL(originalURL)
+			if err != nil {
+				return "", fmt.Errorf("%w", err)
 			}
 			return fmt.Sprintf("%s/%s", baseURL.ToString(), existingShortKey), ErrURLAlreadyExist
 		}
@@ -201,7 +201,7 @@ func (d *DatabaseShortenerRepository) close(ctx context.Context) error {
 
 // Migrate выполняет миграцию базы данных.
 func (d *DatabaseShortenerRepository) Migrate() error {
-	m, err := migrate.New("file://../../internal/migrations", d.databaseDNS)
+	m, err := migrate.New("file://internal/migrations", d.databaseDNS)
 	if err != nil {
 		return ErrOpenMigrateFailed
 	}
