@@ -46,6 +46,7 @@ func NewFileShortenerRepository(baseURL, filePath string) (*FileShortenerReposit
 func (repo *FileShortenerRepository) Get(shortKey string) (*entity.URL, error) {
 	for _, v := range repo.urls {
 		if v.ShortKey == shortKey {
+			slog.Info("URL retrieved successfully", slog.String("shortKey", shortKey))
 			return &v, nil
 		}
 	}
@@ -54,14 +55,16 @@ func (repo *FileShortenerRepository) Get(shortKey string) (*entity.URL, error) {
 
 // Create добавляет новый URL в файл и возвращает его сокращенную версию.
 func (repo *FileShortenerRepository) Create(originalURL string) (string, error) {
-	if shortURL, err := repo.findOrCreateURL(originalURL); err != nil {
+	shortURL, err := repo.findOrCreateURL(originalURL)
+	if err != nil {
 		if errors.Is(err, ErrURLAlreadyExist) {
 			return shortURL, err
 		}
 		return "", err
-	} else {
-		return shortURL, nil
 	}
+
+	slog.Info("URL created successfully", slog.String("originalURL", originalURL), slog.String("shortURL", shortURL))
+	return shortURL, nil
 }
 
 // CreateList добавляет список новых URL в файл и возвращает их сокращенные версии.
@@ -73,16 +76,19 @@ func (repo *FileShortenerRepository) CreateList(urls []*entity.URLItem) ([]*enti
 	shortUrls := make([]*entity.URLItem, 0, len(urls))
 
 	for _, urlItem := range urls {
-		if shortURL, err := repo.findOrCreateURL(urlItem.OriginalURL); err != nil {
+		shortURL, err := repo.findOrCreateURL(urlItem.OriginalURL)
+
+		if err != nil {
 			if errors.Is(err, ErrURLAlreadyExist) {
 				return []*entity.URLItem{{ID: urlItem.ID, ShortURL: shortURL}}, err
 			}
 			return nil, err
-		} else {
-			shortUrls = append(shortUrls, &entity.URLItem{ID: urlItem.ID, ShortURL: shortURL})
 		}
+
+		shortUrls = append(shortUrls, &entity.URLItem{ID: urlItem.ID, ShortURL: shortURL})
 	}
 
+	slog.Info("All URLs created successfully", slog.Int("count", len(shortUrls)))
 	return shortUrls, nil
 }
 
@@ -108,6 +114,7 @@ func (repo *FileShortenerRepository) findOrCreateURL(originalURL string) (string
 	}
 
 	repo.urls[originalURL] = *urlEntity
+	slog.Info("URL added to file repository", slog.String("originalURL", originalURL), slog.String("shortKey", urlEntity.ShortKey))
 	return shortURL.ToString(), nil
 }
 
@@ -158,19 +165,18 @@ func (repo *FileShortenerRepository) ReadAll() error {
 		repo.urls[url.OriginalURL] = url
 	}
 
+	slog.Info("All URLs loaded successfully from file", slog.Int("count", len(repo.urls)))
 	return nil
 }
 
 // makeDir создает директорию для хранения файла, если она не существует.
 func (repo *FileShortenerRepository) makeDir() error {
 	folder := path.Dir(repo.filePath)
-
 	if _, err := os.Stat(folder); os.IsNotExist(err) {
-
 		if err := os.MkdirAll(folder, 0755); err != nil {
 			return fmt.Errorf("%w: %v", ErrCreateDir, err)
 		}
-
+		slog.Info("Directory created for file storage", slog.String("folder", folder))
 	}
 	return nil
 }
@@ -178,7 +184,7 @@ func (repo *FileShortenerRepository) makeDir() error {
 // closeFile закрывает файл и логгирует ошибку, если она произошла.
 func (repo *FileShortenerRepository) closeFile(f *os.File) {
 	if err := f.Close(); err != nil {
-		slog.Error("failed to close file", slog.String("filePath", repo.filePath), slog.String("error", err.Error()))
+		slog.Error("Failed to close file", slog.String("filePath", repo.filePath), slog.String("error", err.Error()))
 	}
 }
 
@@ -187,5 +193,6 @@ func (repo *FileShortenerRepository) CheckHealth() error {
 	if _, err := os.Stat(repo.filePath); os.IsNotExist(err) {
 		return fmt.Errorf("file does not exist: %w", err)
 	}
+	slog.Info("File repository health check passed", slog.String("filePath", repo.filePath))
 	return nil
 }

@@ -3,6 +3,7 @@ package storage
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
@@ -25,6 +26,7 @@ func NewMemoryShortenerRepository(baseURL string) *MemoryShortenerRepository {
 func (rm *MemoryShortenerRepository) Get(shortKey string) (*entity.URL, error) {
 	for _, v := range rm.urls {
 		if v.ShortKey == shortKey {
+			slog.Info("URL retrieved successfully", slog.String("shortKey", shortKey))
 			return &v, nil
 		}
 	}
@@ -33,11 +35,12 @@ func (rm *MemoryShortenerRepository) Get(shortKey string) (*entity.URL, error) {
 
 // Create добавляет новый URL в репозиторий, если его еще нет.
 func (rm *MemoryShortenerRepository) Create(originalURL string) (string, error) {
-	if shortURL, err := rm.findOrCreateURL(originalURL); err != nil {
+	shortURL, err := rm.findOrCreateURL(originalURL)
+	if err != nil {
 		return shortURL, err
-	} else {
-		return shortURL, nil
 	}
+	slog.Info("URL created successfully", slog.String("originalURL", originalURL), slog.String("shortURL", shortURL))
+	return shortURL, nil
 }
 
 // CreateList добавляет список новых URL в репозиторий, возвращая их сокращенные версии.
@@ -49,15 +52,17 @@ func (rm *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*enti
 	var shortUrls []*entity.URLItem
 
 	for _, urlItem := range urls {
-		if shortURL, err := rm.findOrCreateURL(urlItem.OriginalURL); errors.Is(err, ErrURLAlreadyExist) {
-			return []*entity.URLItem{{ID: urlItem.ID, ShortURL: shortURL}}, err
-		} else if err == nil {
-			shortUrls = append(shortUrls, &entity.URLItem{ID: urlItem.ID, ShortURL: shortURL})
-		} else {
+		shortURL, err := rm.findOrCreateURL(urlItem.OriginalURL)
+		if err != nil {
+			if errors.Is(err, ErrURLAlreadyExist) {
+				return []*entity.URLItem{{ID: urlItem.ID, ShortURL: shortURL}}, err
+			}
 			return nil, err
 		}
+		shortUrls = append(shortUrls, &entity.URLItem{ID: urlItem.ID, ShortURL: shortURL})
 	}
 
+	slog.Info("All URLs created successfully", slog.Int("count", len(shortUrls)))
 	return shortUrls, nil
 }
 
@@ -66,6 +71,7 @@ func (rm *MemoryShortenerRepository) CheckHealth() error {
 	if rm.urls == nil {
 		return fmt.Errorf("memory urls structure is not initialized")
 	}
+	slog.Info("Memory repository health check passed")
 	return nil
 }
 
@@ -86,6 +92,7 @@ func (rm *MemoryShortenerRepository) findOrCreateURL(originalURL string) (string
 
 	// Сохраняем ссылку в хранилище in-memory
 	rm.urls[urlEntity.OriginalURL] = *urlEntity
+	slog.Info("URL added to memory repository", slog.String("originalURL", originalURL), slog.String("shortKey", urlEntity.ShortKey))
 
 	return shortURL.ToString(), nil
 }

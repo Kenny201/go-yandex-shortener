@@ -68,6 +68,7 @@ func (d *DatabaseShortenerRepository) Get(shortKey string) (*entity.URL, error) 
 		return nil, fmt.Errorf("%w, func: Get", ErrScanQuery)
 	}
 
+	slog.Info("URL retrieved", slog.String("shortKey", shortKey), slog.String("originalURL", url.OriginalURL))
 	return url, nil
 }
 
@@ -94,7 +95,9 @@ func (d *DatabaseShortenerRepository) Create(originalURL string) (string, error)
 		return "", fmt.Errorf("%w", err)
 	}
 
-	return fmt.Sprintf("%s/%s", baseURL.ToString(), urlEntity.ShortKey), nil
+	shortURLStr := fmt.Sprintf("%s/%s", baseURL.ToString(), urlEntity.ShortKey)
+	slog.Info("URL created", slog.String("originalURL", originalURL), slog.String("shortURL", shortURLStr))
+	return shortURLStr, nil
 }
 
 // getShortKeyByOriginalURL возвращает существующий короткий ключ для заданного оригинального URL.
@@ -138,9 +141,11 @@ func (d *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*ent
 	}
 
 	if int(copyCount) != len(linkedSubjects) {
+		slog.Error("Mismatch in copied data count", slog.Int64("copiedCount", copyCount), slog.Int("expectedCount", len(linkedSubjects)))
 		return nil, fmt.Errorf("%w: %d rows copied, expected %d", ErrCopyCount, copyCount, len(linkedSubjects))
 	}
 
+	slog.Info("Batch URL creation successful", slog.Int("count", len(linkedSubjects)))
 	return shortUrls, nil
 }
 
@@ -204,6 +209,7 @@ func (d *DatabaseShortenerRepository) Migrate() error {
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migration failed: %v", err)
 	}
+	slog.Info("Database migration successful")
 	return nil
 }
 
@@ -212,5 +218,6 @@ func (d *DatabaseShortenerRepository) CheckHealth() error {
 	if err := d.db.Ping(context.Background()); err != nil {
 		return fmt.Errorf("unable to ping database: %w", err)
 	}
+	slog.Info("Database connection is healthy")
 	return nil
 }
