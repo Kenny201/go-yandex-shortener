@@ -1,8 +1,8 @@
 package valueobject
 
 import (
-	"crypto/rand"
 	"fmt"
+	"math/rand"
 )
 
 const (
@@ -38,16 +38,8 @@ func (su ShortURL) ShortKey() string {
 func generateShortKey() string {
 	b := make([]byte, shortURLLength)
 
-	_, err := rand.Read(b)
-
-	if err != nil {
-		// На случай ошибки генерации случайных чисел
-		panic(fmt.Sprintf("failed to generate short key: %v", err))
-	}
-
-	// Преобразуем байты в строку, используя только разрешенные символы
 	for i := range b {
-		b[i] = letterBytes[int(b[i])%len(letterBytes)]
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
 
 	return string(b)
