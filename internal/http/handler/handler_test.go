@@ -16,6 +16,7 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/mocks"
 )
 
@@ -241,6 +242,79 @@ func TestPingHandler(t *testing.T) {
 
 			if response.StatusCode != tt.wantStatusCode {
 				t.Errorf("expected status: got %v, want %v", response.StatusCode, tt.wantStatusCode)
+			}
+		})
+	}
+}
+
+// TestPostBatchHandler тестирует обработчик создания нескольких коротких URL.
+func TestPostBatchHandler(t *testing.T) {
+	tests := []struct {
+		name                    string
+		body                    string
+		mockReturnValue         []*entity.URLItem
+		mockReturnError         error
+		wantStatusCode          int
+		wantResponseContentType string
+		expectCreateListCalled  bool
+	}{
+		{
+			name: "post_batch_with_valid_urls",
+			body: `[{"url": "https://yandex.ru"}, {"url": "https://practicum.yandex.ru"}]`,
+			mockReturnValue: []*entity.URLItem{
+				{ID: "1", ShortURL: "some-short-url-1"},
+				{ID: "2", ShortURL: "some-short-url-2"},
+			},
+			mockReturnError:         nil,
+			wantStatusCode:          http.StatusCreated,
+			wantResponseContentType: "application/json",
+			expectCreateListCalled:  true,
+		},
+		{
+			name:                    "post_batch_with_empty_body",
+			body:                    "",
+			mockReturnValue:         nil,
+			mockReturnError:         ErrURLIsEmpty,
+			wantStatusCode:          http.StatusBadRequest,
+			wantResponseContentType: "application/json",
+			expectCreateListCalled:  false,
+		},
+		{
+			name: "post_batch_with_conflicting_urls",
+			body: `[{"url": "https://yandex.ru"}]`,
+			mockReturnValue: []*entity.URLItem{
+				{ID: "1", ShortURL: "some-short-url-1"},
+			},
+			mockReturnError:         storage.ErrURLAlreadyExist,
+			wantStatusCode:          http.StatusConflict,
+			wantResponseContentType: "application/json",
+			expectCreateListCalled:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepository, ctrl, shortenerService := setupTestEnvironment(t)
+			defer ctrl.Finish()
+
+			if tt.expectCreateListCalled {
+				mockRepository.EXPECT().CreateList(gomock.Any()).Return(tt.mockReturnValue, tt.mockReturnError)
+			} else {
+				mockRepository.EXPECT().CreateList(gomock.Any()).Times(0)
+			}
+
+			rw, req := sendRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(tt.body))
+			New(shortenerService).PostBatch(rw, req)
+
+			response := rw.Result()
+			defer responseClose(t, response)
+
+			if response.StatusCode != tt.wantStatusCode {
+				t.Errorf("expected status: got %v, want %v", response.StatusCode, tt.wantStatusCode)
+			}
+
+			if contentType := response.Header.Get("Content-Type"); contentType != tt.wantResponseContentType {
+				t.Errorf("response content type header does not match: got %v, want %v", contentType, tt.wantResponseContentType)
 			}
 		})
 	}
