@@ -1,98 +1,105 @@
 package config
 
 import (
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"strings"
+	"os"
 	"testing"
-
-	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/http/handler"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
-const (
-	URL = "http://localhost:8080"
-)
-
-func TestFlags(t *testing.T) {
+// TestParseFlags проверяет, правильно ли парсятся флаги
+func TestParseFlags(t *testing.T) {
 	tests := []struct {
-		name           string
-		body           string
-		args           []string
-		wantStatusCode int
+		name     string
+		args     []string
+		expected Args
 	}{
 		{
-			name: "set port 8080 into argument shortener_server_address",
-			body: "https://yandex.ru",
+			name: "Parse flags correctly",
 			args: []string{
-				"-a", "http://localhost:8080",
-				"-b", "http://localhost:8080",
+				"-a=:8081",
+				"-b=http://localhost:8081",
+				"-f=/tmp/storage.txt",
+				"-d=postgres://user:pass@localhost/dbname",
 			},
-			wantStatusCode: http.StatusCreated,
-		},
-		{
-			name: "set port 8090 into argument shortener_server_address",
-			body: "https://yandex.ru",
-			args: []string{
-				"-a", "http://localhost:8090",
-				"-b", "http://localhost:8080",
+			expected: Args{
+				ServerAddress:   ":8081",
+				BaseURL:         "http://localhost:8081",
+				FileStoragePath: "/tmp/storage.txt",
+				DatabaseDNS:     "postgres://user:pass@localhost/dbname",
 			},
-			wantStatusCode: http.StatusCreated,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := initArgs(t, tt.args)
+			config := &Config{Port: "8080"}
+			args := NewArgs(config)
 
-			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
+			args.ParseFlags(tt.args)
 
-			repository := storage.NewMemoryShortenerRepository(args.BaseURL)
-			service := shortener.New(repository)
-
-			handler.New(service).Post(rw, r)
-
-			res := rw.Result()
-			defer responseClose(t, res)
-
-			_, err := io.ReadAll(res.Body)
-
-			if err != nil {
-				t.Fatalf("could not read response:%v", err)
+			if args.ServerAddress != tt.expected.ServerAddress {
+				t.Errorf("expected ServerAddress to be '%s', got '%s'", tt.expected.ServerAddress, args.ServerAddress)
 			}
-
-			if res.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status: got %v want %v", res.StatusCode, tt.wantStatusCode)
+			if args.BaseURL != tt.expected.BaseURL {
+				t.Errorf("expected BaseURL to be '%s', got '%s'", tt.expected.BaseURL, args.BaseURL)
+			}
+			if args.FileStoragePath != tt.expected.FileStoragePath {
+				t.Errorf("expected FileStoragePath to be '%s', got '%s'", tt.expected.FileStoragePath, args.FileStoragePath)
+			}
+			if args.DatabaseDNS != tt.expected.DatabaseDNS {
+				t.Errorf("expected DatabaseDNS to be '%s', got '%s'", tt.expected.DatabaseDNS, args.DatabaseDNS)
 			}
 		})
 	}
 }
 
-func initArgs(t *testing.T, args []string) *Args {
-	t.Helper()
-	conf, err := LoadConfig("../../../")
-
-	if err != nil {
-		t.Errorf(err.Error())
+// TestOverrideWithEnvVars checks if environment variables override flags
+func TestOverrideWithEnvVars(t *testing.T) {
+	tests := []struct {
+		name     string
+		envVars  map[string]string
+		expected Args
+	}{
+		{
+			name: "Override flags with environment variables",
+			envVars: map[string]string{
+				"SHORTENER_SERVER_ADDRESS": ":9090",
+				"SHORTENER_BASE_URL":       "http://localhost:9090",
+				"FILE_STORAGE_PATH":        "/data/storage.txt",
+				"DATABASE_DSN":             "postgres://user:pass@localhost/newdb",
+			},
+			expected: Args{
+				ServerAddress:   ":9090",
+				BaseURL:         "http://localhost:9090",
+				FileStoragePath: "/data/storage.txt",
+				DatabaseDNS:     "postgres://user:pass@localhost/newdb",
+			},
+		},
 	}
 
-	a := NewArgs(conf)
-	a.ParseFlags(args)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &Config{Port: "8080"}
+			args := NewArgs(config)
 
-	return a
-}
+			for k, v := range tt.envVars {
+				os.Setenv(k, v)
+			}
+			defer os.Clearenv()
 
-func responseClose(t *testing.T, response *http.Response) {
-	t.Helper()
-	err := response.Body.Close()
-	if err != nil {
-		t.Errorf("failed to close response body: %v", err.Error())
+			args.ParseFlags([]string{})
+
+			if args.ServerAddress != tt.expected.ServerAddress {
+				t.Errorf("expected ServerAddress to be '%s', got '%s'", tt.expected.ServerAddress, args.ServerAddress)
+			}
+			if args.BaseURL != tt.expected.BaseURL {
+				t.Errorf("expected BaseURL to be '%s', got '%s'", tt.expected.BaseURL, args.BaseURL)
+			}
+			if args.FileStoragePath != tt.expected.FileStoragePath {
+				t.Errorf("expected FileStoragePath to be '%s', got '%s'", tt.expected.FileStoragePath, args.FileStoragePath)
+			}
+			if args.DatabaseDNS != tt.expected.DatabaseDNS {
+				t.Errorf("expected DatabaseDNS to be '%s', got '%s'", tt.expected.DatabaseDNS, args.DatabaseDNS)
+			}
+		})
 	}
-}
-
-func sendRequest(method, url string, body io.Reader) (*httptest.ResponseRecorder, *http.Request) {
-	req := httptest.NewRequest(method, url, body)
-	return httptest.NewRecorder(), req
 }
