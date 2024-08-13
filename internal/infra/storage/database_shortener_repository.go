@@ -28,6 +28,7 @@ var (
 	ErrCopyFrom            = errors.New("error copy from")
 	ErrCopyCount           = errors.New("differences in the amount of data copied")
 	ErrURLAlreadyExist     = errors.New("duplicate key found")
+	ErrEmptyURL            = errors.New("empty URL list provided")
 )
 
 type DatabaseShortenerRepository struct {
@@ -111,6 +112,10 @@ func (d *DatabaseShortenerRepository) getShortKeyByOriginalURL(originalURL strin
 
 // CreateList добавляет список новых коротких URL в базу данных.
 func (d *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error) {
+	if len(urls) == 0 {
+		return nil, ErrEmptyURL
+	}
+
 	baseURL, err := valueobject.NewBaseURL(d.baseURL)
 	if err != nil {
 		return nil, err

@@ -42,6 +42,10 @@ func (rm *MemoryShortenerRepository) Create(originalURL string) (string, error) 
 
 // CreateList добавляет список новых URL в репозиторий, возвращая их сокращенные версии.
 func (rm *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error) {
+	if len(urls) == 0 {
+		return nil, ErrEmptyURL
+	}
+
 	var shortUrls []*entity.URLItem
 
 	for _, urlItem := range urls {

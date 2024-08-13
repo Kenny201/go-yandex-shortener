@@ -66,6 +66,10 @@ func (repo *FileShortenerRepository) Create(originalURL string) (string, error) 
 
 // CreateList добавляет список новых URL в файл и возвращает их сокращенные версии.
 func (repo *FileShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error) {
+	if len(urls) == 0 {
+		return nil, ErrEmptyURL
+	}
+
 	shortUrls := make([]*entity.URLItem, 0, len(urls))
 
 	for _, urlItem := range urls {
