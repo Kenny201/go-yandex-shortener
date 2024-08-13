@@ -52,7 +52,7 @@ func TestParseFlags(t *testing.T) {
 	}
 }
 
-// TestOverrideWithEnvVars checks if environment variables override flags
+// TestOverrideWithEnvVars проверяет, переопределяют ли переменные среды флаги
 func TestOverrideWithEnvVars(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -49,16 +49,18 @@ func (rm *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*enti
 		return nil, ErrEmptyURL
 	}
 
-	var shortUrls []*entity.URLItem
+	shortUrls := make([]*entity.URLItem, 0, len(urls))
 
 	for _, urlItem := range urls {
 		shortURL, err := rm.findOrCreateURL(urlItem.OriginalURL)
+
 		if err != nil {
 			if errors.Is(err, ErrURLAlreadyExist) {
 				return []*entity.URLItem{{ID: urlItem.ID, ShortURL: shortURL}}, err
 			}
 			return nil, err
 		}
+
 		shortUrls = append(shortUrls, &entity.URLItem{ID: urlItem.ID, ShortURL: shortURL})
 	}
 

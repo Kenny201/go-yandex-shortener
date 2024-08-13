@@ -165,7 +165,7 @@ func (d *DatabaseShortenerRepository) prepareInsertData(urls []*entity.URLItem, 
 
 // handleUniqueViolation обрабатывает случаи нарушения уникальности при вставке данных в базу данных.
 func (d *DatabaseShortenerRepository) handleUniqueViolation(urls []*entity.URLItem, baseURL valueobject.BaseURL) ([]*entity.URLItem, error) {
-	duplicatedItems := make([]*entity.URLItem, 0)
+	duplicatedItems := make([]*entity.URLItem, 0, len(urls))
 	for _, v := range urls {
 		existingShortKey, err := d.getShortKeyByOriginalURL(v.OriginalURL)
 		if err == nil {
@@ -201,7 +201,7 @@ func (d *DatabaseShortenerRepository) close(ctx context.Context) error {
 
 // Migrate выполняет миграцию базы данных.
 func (d *DatabaseShortenerRepository) Migrate() error {
-	m, err := migrate.New("file://internal/migrations", d.databaseDNS)
+	m, err := migrate.New("file://../../internal/migrations", d.databaseDNS)
 	if err != nil {
 		return ErrOpenMigrateFailed
 	}
