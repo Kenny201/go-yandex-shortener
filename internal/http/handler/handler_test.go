@@ -19,7 +19,15 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/internal/mocks"
 )
 
-// TestPostHandler тестирует обработчик создания короткого URL
+// setupTestEnvironment инициализирует окружение для теста.
+func setupTestEnvironment(t *testing.T) (*mocks.MockRepository, *gomock.Controller, *shortener.Shortener) {
+	ctrl := gomock.NewController(t)
+	mockRepository := mocks.NewMockRepository(ctrl)
+	shortenerService := shortener.New(mockRepository)
+	return mockRepository, ctrl, shortenerService
+}
+
+// TestPostHandler тестирует обработчик создания короткого URL.
 func TestPostHandler(t *testing.T) {
 	tests := []struct {
 		name                    string
@@ -49,39 +57,33 @@ func TestPostHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
+			mockRepository, ctrl, shortenerService := setupTestEnvironment(t)
 			defer ctrl.Finish()
 
-			// Создаем mock для интерфейса Repository
-			mockRepository := mocks.NewMockRepository(ctrl)
-
-			// Ожидание вызова Create только в случае валидного тела запроса
 			if tt.wantStatusCode == http.StatusCreated {
 				mockRepository.EXPECT().Create(tt.body).Return("some-short-url", nil)
 			}
 
-			rw, r := sendRequest(http.MethodPost, "/", strings.NewReader(tt.body))
-			shortenerService := shortener.New(mockRepository)
-			New(shortenerService).Post(rw, r)
+			rw, req := sendRequest(http.MethodPost, "/", strings.NewReader(tt.body))
+			New(shortenerService).Post(rw, req)
 
 			response := rw.Result()
-			defer response.Body.Close()
+			defer responseClose(t, response)
 
 			if response.StatusCode != tt.wantStatusCode {
-				t.Errorf("expected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
+				t.Errorf("expected status: got %v, want %v", response.StatusCode, tt.wantStatusCode)
 			}
 
-			if response.Header.Get("Content-Type") != tt.wantResponseContentType {
-				t.Errorf("response content type header does not match: got %v want %v",
-					response.Header.Get("Content-Type"), tt.wantResponseContentType)
+			if contentType := response.Header.Get("Content-Type"); contentType != tt.wantResponseContentType {
+				t.Errorf("response content type header does not match: got %v, want %v", contentType, tt.wantResponseContentType)
 			}
 		})
 	}
 }
 
-// TestGetHandler тестирует обработчик получения оригинального URL по короткому ключу
+// TestGetHandler тестирует обработчик получения оригинального URL по короткому ключу.
 func TestGetHandler(t *testing.T) {
-	var args = initArgs(t)
+	args := initArgs(t)
 
 	tests := []struct {
 		name               string
@@ -110,49 +112,42 @@ func TestGetHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
+			mockRepository, ctrl, shortenerService := setupTestEnvironment(t)
 			defer ctrl.Finish()
 
-			// Создаем mock для интерфейса Repository
-			mockRepository := mocks.NewMockRepository(ctrl)
-
 			if tt.wantStatusCode != http.StatusNotFound {
-				// Ожидаем, что метод Get вернет сущность URL с исходным URL
 				mockRepository.EXPECT().Get(tt.id).Return(&entity.URL{
 					ID:          "some-id",
 					ShortKey:    tt.id,
 					OriginalURL: tt.wantLocationHeader,
 				}, nil)
 			} else {
-				// Ожидаем, что метод Get вернет ошибку "not found"
 				mockRepository.EXPECT().Get(tt.id).Return(nil, fmt.Errorf("not found"))
 			}
 
-			rw, req := sendRequest(http.MethodGet, args.BaseURL, nil)
+			// Полный URL с коротким ключом
+			rw, req := sendRequest(http.MethodGet, fmt.Sprintf("%s/%s", args.BaseURL, tt.id), nil)
 			req = withURLParam(req, "id", tt.id)
-
-			shortenerService := shortener.New(mockRepository)
 			New(shortenerService).Get(rw, req)
 
 			response := rw.Result()
-			defer response.Body.Close()
+			defer responseClose(t, response)
 
 			if response.StatusCode != tt.wantStatusCode {
-				t.Errorf("expected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
+				t.Errorf("expected status: got %v, want %v", response.StatusCode, tt.wantStatusCode)
 			}
 
-			if response.StatusCode == http.StatusTemporaryRedirect {
-				if response.Header.Get("Location") != tt.wantLocationHeader {
-					t.Errorf("response Location header does not match: got %v want %v",
-						response.Header.Get("Location"), tt.wantLocationHeader)
-				}
+			if response.StatusCode == http.StatusTemporaryRedirect && response.Header.Get("Location") != tt.wantLocationHeader {
+				t.Errorf("response Location header does not match: got %v, want %v",
+					response.Header.Get("Location"), tt.wantLocationHeader)
 			}
 		})
 	}
 }
 
+// TestPostAPIHandler тестирует обработчик создания короткого URL через JSON API.
 func TestPostAPIHandler(t *testing.T) {
-	var args = initArgs(t)
+	args := initArgs(t)
 
 	tests := []struct {
 		name                    string
@@ -179,7 +174,7 @@ func TestPostAPIHandler(t *testing.T) {
 			wantResponseContentType: "application/json",
 		},
 		{
-			name:                    "post request when body isn`t json type",
+			name:                    "post request when body isn't json type",
 			body:                    "https://practicum.yandex.ru",
 			wantStatusCode:          http.StatusBadRequest,
 			wantResponseContentType: "application/json",
@@ -188,53 +183,42 @@ func TestPostAPIHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
+			mockRepository, ctrl, shortenerService := setupTestEnvironment(t)
 			defer ctrl.Finish()
 
-			// Создаем mock для интерфейса DB
-			mockRepository := mocks.NewMockRepository(ctrl)
-
-			// Парсим тело JSON
 			var requestBody map[string]string
 			if tt.body != "" && tt.wantStatusCode == http.StatusCreated {
 				err := json.Unmarshal([]byte(tt.body), &requestBody)
 				if err == nil {
 					originalURL := requestBody["url"]
-
-					// Убедитесь, что вы ожидаете вызова Create с правильным аргументом
 					mockRepository.EXPECT().Create(originalURL).Return("some-short-url", nil)
 				}
 			}
 
 			rw, req := sendRequest(http.MethodPost, args.BaseURL, strings.NewReader(tt.body))
-
-			shortenerService := shortener.New(mockRepository)
-
 			New(shortenerService).PostAPI(rw, req)
 
 			response := rw.Result()
 			defer responseClose(t, response)
 
 			if response.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
+				t.Errorf("expected status: got %v, want %v", response.StatusCode, tt.wantStatusCode)
 			}
 
-			if response.Header.Get("Content-Type") != tt.wantResponseContentType {
-				t.Errorf("response content type header does not match: got %v wantResponseContentType %v",
-					response.Header.Get("Content-Type"), tt.wantResponseContentType)
+			if contentType := response.Header.Get("Content-Type"); contentType != tt.wantResponseContentType {
+				t.Errorf("response content type header does not match: got %v, want %v", contentType, tt.wantResponseContentType)
 			}
 		})
 	}
 }
 
+// TestPingHandler тестирует обработчик проверки состояния сервиса.
 func TestPingHandler(t *testing.T) {
 	args := initArgs(t)
 
 	tests := []struct {
-		name                    string
-		body                    string
-		wantStatusCode          int
-		wantResponseContentType string
+		name           string
+		wantStatusCode int
 	}{
 		{
 			name:           "test ping handler",
@@ -244,25 +228,19 @@ func TestPingHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
+			mockRepository, ctrl, shortenerService := setupTestEnvironment(t)
 			defer ctrl.Finish()
 
-			// Создаем mock для интерфейса DB
-			mockRepository := mocks.NewMockRepository(ctrl)
-
-			// Настраиваем ожидания для метода Ping
 			mockRepository.EXPECT().CheckHealth().Return(nil)
 
-			rw, req := sendRequest(http.MethodGet, args.BaseURL, strings.NewReader(tt.body))
-			shortenerService := shortener.New(mockRepository)
-
+			rw, req := sendRequest(http.MethodGet, args.BaseURL, nil)
 			New(shortenerService).Ping(rw, req)
 
 			response := rw.Result()
 			defer responseClose(t, response)
 
 			if response.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status: got %v want %v", response.StatusCode, tt.wantStatusCode)
+				t.Errorf("expected status: got %v, want %v", response.StatusCode, tt.wantStatusCode)
 			}
 		})
 	}
