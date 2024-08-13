@@ -29,6 +29,7 @@ var (
 	ErrCopyCount           = errors.New("differences in the amount of data copied")
 	ErrURLAlreadyExist     = errors.New("duplicate key found")
 	ErrEmptyURL            = errors.New("empty URL list provided")
+	pgErr                  *pgconn.PgError
 )
 
 type DatabaseShortenerRepository struct {
@@ -85,7 +86,7 @@ func (d *DatabaseShortenerRepository) Create(originalURL string) (string, error)
 	query := "INSERT INTO shorteners (id, short_url, original_url) VALUES ($1, $2, $3)"
 	_, err = d.db.Exec(context.Background(), query, urlEntity.ID, urlEntity.ShortKey, urlEntity.OriginalURL)
 	if err != nil {
-		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == pgerrcode.UniqueViolation {
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 			existingShortKey, err := d.getShortKeyByOriginalURL(originalURL)
 			if err != nil {
 				return "", fmt.Errorf("%w", err)
@@ -124,43 +125,43 @@ func (d *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*ent
 		return nil, err
 	}
 
-	linkedSubjects, shortUrls := d.prepareInsertData(urls, baseURL)
+	urlBatchData, shortUrls := d.prepareInsertData(urls, baseURL)
 
-	copyCount, err := d.db.CopyFrom(
+	rowsCopied, err := d.db.CopyFrom(
 		context.Background(),
 		pgx.Identifier{"shorteners"},
 		[]string{"id", "short_url", "original_url"},
-		pgx.CopyFromRows(linkedSubjects),
+		pgx.CopyFromRows(urlBatchData),
 	)
 
 	if err != nil {
-		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == pgerrcode.UniqueViolation {
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 			return d.handleUniqueViolation(urls, baseURL)
 		}
-		return nil, d.handleCopyError(err, copyCount, linkedSubjects)
+		return nil, d.handleCopyError(err, rowsCopied, urlBatchData)
 	}
 
-	if int(copyCount) != len(linkedSubjects) {
-		slog.Error("Mismatch in copied data count", slog.Int64("copiedCount", copyCount), slog.Int("expectedCount", len(linkedSubjects)))
-		return nil, fmt.Errorf("%w: %d rows copied, expected %d", ErrCopyCount, copyCount, len(linkedSubjects))
+	if int(rowsCopied) != len(urlBatchData) {
+		slog.Error("Mismatch in copied data count", slog.Int64("copiedCount", rowsCopied), slog.Int("expectedCount", len(urlBatchData)))
+		return nil, fmt.Errorf("%w: %d rows copied, expected %d", ErrCopyCount, rowsCopied, len(urlBatchData))
 	}
 
-	slog.Info("Batch URL creation successful", slog.Int("count", len(linkedSubjects)))
+	slog.Info("Batch URL creation successful", slog.Int("count", len(urlBatchData)))
 	return shortUrls, nil
 }
 
 // prepareInsertData подготавливает данные для вставки в базу данных.
 func (d *DatabaseShortenerRepository) prepareInsertData(urls []*entity.URLItem, baseURL valueobject.BaseURL) ([][]interface{}, []*entity.URLItem) {
-	linkedSubjects := make([][]interface{}, 0, len(urls))
+	urlBatchData := make([][]interface{}, 0, len(urls))
 	shortUrls := make([]*entity.URLItem, 0, len(urls))
 
 	for _, v := range urls {
 		shortURL := valueobject.NewShortURL(baseURL)
-		linkedSubjects = append(linkedSubjects, []interface{}{v.ID, shortURL.ShortKey(), v.OriginalURL})
+		urlBatchData = append(urlBatchData, []interface{}{v.ID, shortURL.ShortKey(), v.OriginalURL})
 		shortUrls = append(shortUrls, &entity.URLItem{ID: v.ID, ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), shortURL.ShortKey())})
 	}
 
-	return linkedSubjects, shortUrls
+	return urlBatchData, shortUrls
 }
 
 // handleUniqueViolation обрабатывает случаи нарушения уникальности при вставке данных в базу данных.
@@ -179,12 +180,12 @@ func (d *DatabaseShortenerRepository) handleUniqueViolation(urls []*entity.URLIt
 }
 
 // handleCopyError обрабатывает ошибки при копировании данных в базу данных.
-func (d *DatabaseShortenerRepository) handleCopyError(err error, copyCount int64, linkedSubjects [][]interface{}) error {
-	if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == pgerrcode.UniqueViolation {
-		return fmt.Errorf("%w for id: %s", ErrURLAlreadyExist, linkedSubjects[copyCount][0])
+func (d *DatabaseShortenerRepository) handleCopyError(err error, rowsCopied int64, urlBatchData [][]interface{}) error {
+	if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+		return fmt.Errorf("%w for id: %s", ErrURLAlreadyExist, urlBatchData[rowsCopied][0])
 	}
-	if int(copyCount) != len(linkedSubjects) {
-		return fmt.Errorf("%w: %d rows copied, expected %d", ErrCopyCount, copyCount, len(linkedSubjects))
+	if int(rowsCopied) != len(urlBatchData) {
+		return fmt.Errorf("%w: %d rows copied, expected %d", ErrCopyCount, rowsCopied, len(urlBatchData))
 	}
 	return fmt.Errorf("%w: %v", ErrCopyFrom, err)
 }
