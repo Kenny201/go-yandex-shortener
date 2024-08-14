@@ -13,7 +13,7 @@ func TestParseFlags(t *testing.T) {
 		expected Args
 	}{
 		{
-			name: "Parse flags correctly",
+			name: "parse_flags_correctly",
 			args: []string{
 				"-a=:8081",
 				"-b=http://localhost:8081",
@@ -60,7 +60,7 @@ func TestOverrideWithEnvVars(t *testing.T) {
 		expected Args
 	}{
 		{
-			name: "Override flags with environment variables",
+			name: "override_flags_with_environment_variables",
 			envVars: map[string]string{
 				"SHORTENER_SERVER_ADDRESS": ":9090",
 				"SHORTENER_BASE_URL":       "http://localhost:9090",

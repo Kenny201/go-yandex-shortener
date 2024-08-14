@@ -157,25 +157,25 @@ func TestPostAPIHandler(t *testing.T) {
 		wantResponseContentType string
 	}{
 		{
-			name:                    "post json request for body https://yandex.ru",
+			name:                    "post_json_request_for_body_https://yandex.ru",
 			body:                    `{"url": "https://yandex.ru"}`,
 			wantStatusCode:          http.StatusCreated,
 			wantResponseContentType: "application/json",
 		},
 		{
-			name:                    "post json request for body https://practicum.yandex.ru",
+			name:                    "post_json_request_for_body_https://practicum.yandex.ru",
 			body:                    `{"url": "https://practicum.yandex.ru"}`,
 			wantStatusCode:          http.StatusCreated,
 			wantResponseContentType: "application/json",
 		},
 		{
-			name:                    "post json request for empty body",
+			name:                    "post_json_request_for_empty_body",
 			body:                    "",
 			wantStatusCode:          http.StatusBadRequest,
 			wantResponseContentType: "application/json",
 		},
 		{
-			name:                    "post request when body isn't json type",
+			name:                    "post_request_when_body_isn't_json_type",
 			body:                    "https://practicum.yandex.ru",
 			wantStatusCode:          http.StatusBadRequest,
 			wantResponseContentType: "application/json",
@@ -222,7 +222,7 @@ func TestPingHandler(t *testing.T) {
 		wantStatusCode int
 	}{
 		{
-			name:           "test ping handler",
+			name:           "test_ping_handler",
 			wantStatusCode: http.StatusOK,
 		},
 	}
