@@ -77,7 +77,6 @@ func (repo *FileShortenerRepository) CreateList(urls []*entity.URLItem) ([]*enti
 
 	for _, urlItem := range urls {
 		shortURL, err := repo.findOrCreateURL(urlItem.OriginalURL)
-
 		if err != nil {
 			if errors.Is(err, ErrURLAlreadyExist) {
 				return []*entity.URLItem{{ID: urlItem.ID, ShortURL: shortURL}}, err
@@ -95,12 +94,10 @@ func (repo *FileShortenerRepository) CreateList(urls []*entity.URLItem) ([]*enti
 // findOrCreateURL ищет существующий URL в файле или создает новый, если не найден.
 func (repo *FileShortenerRepository) findOrCreateURL(originalURL string) (string, error) {
 	baseURL, err := valueobject.NewBaseURL(repo.baseURL)
-
 	if err != nil {
 		return "", err
 	}
 
-	// Проверка существования записи в мапе urls.
 	if url, exists := repo.urls[originalURL]; exists {
 		return fmt.Sprintf("%s/%s", baseURL.ToString(), url.ShortKey), ErrURLAlreadyExist
 	}

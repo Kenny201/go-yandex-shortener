@@ -30,7 +30,7 @@ func (rm *MemoryShortenerRepository) Get(shortKey string) (*entity.URL, error) {
 			return &v, nil
 		}
 	}
-	return nil, fmt.Errorf("url %v not found", shortKey)
+	return nil, fmt.Errorf("URL %v not found", shortKey)
 }
 
 // Create добавляет новый URL в репозиторий, если его еще нет.
@@ -53,7 +53,6 @@ func (rm *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*enti
 
 	for _, urlItem := range urls {
 		shortURL, err := rm.findOrCreateURL(urlItem.OriginalURL)
-
 		if err != nil {
 			if errors.Is(err, ErrURLAlreadyExist) {
 				return []*entity.URLItem{{ID: urlItem.ID, ShortURL: shortURL}}, err
@@ -71,7 +70,7 @@ func (rm *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*enti
 // CheckHealth проверяет состояние репозитория, возвращая ошибку, если он не инициализирован.
 func (rm *MemoryShortenerRepository) CheckHealth() error {
 	if rm.urls == nil {
-		return fmt.Errorf("memory urls structure is not initialized")
+		return fmt.Errorf("memory URLs structure is not initialized")
 	}
 	slog.Info("Memory repository health check passed")
 	return nil
@@ -84,16 +83,14 @@ func (rm *MemoryShortenerRepository) findOrCreateURL(originalURL string) (string
 		return "", err
 	}
 
-	// Проверка существования записи в карте urls.
-	if value, ok := rm.urls[originalURL]; ok {
+	if value, exists := rm.urls[originalURL]; exists {
 		return fmt.Sprintf("%s/%s", baseURL.ToString(), value.ShortKey), ErrURLAlreadyExist
 	}
 
 	shortURL := valueobject.NewShortURL(baseURL)
 	urlEntity := entity.NewURL(originalURL, shortURL.ShortKey())
 
-	// Сохраняем ссылку в хранилище in-memory
-	rm.urls[urlEntity.OriginalURL] = *urlEntity
+	rm.urls[originalURL] = *urlEntity
 	slog.Info("URL added to memory repository", slog.String("originalURL", originalURL), slog.String("shortKey", urlEntity.ShortKey))
 
 	return shortURL.ToString(), nil

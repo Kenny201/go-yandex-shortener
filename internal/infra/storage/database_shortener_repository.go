@@ -41,7 +41,7 @@ type DatabaseShortenerRepository struct {
 func NewDatabaseShortenerRepository(baseURL, databaseDNS string) (*DatabaseShortenerRepository, error) {
 	db, err := pgx.Connect(context.Background(), databaseDNS)
 	if err != nil {
-		return nil, ErrOpenDatabaseFailed
+		return nil, fmt.Errorf("%w: %v", ErrOpenDatabaseFailed, err)
 	}
 
 	repo := &DatabaseShortenerRepository{
@@ -50,7 +50,7 @@ func NewDatabaseShortenerRepository(baseURL, databaseDNS string) (*DatabaseShort
 		baseURL:     baseURL,
 	}
 
-	// Добавляет функцию закрытия соединения в closer.
+	// Добавляем функцию закрытия соединения в closer.
 	closer.CL.Add(repo.close)
 	return repo, nil
 }
@@ -102,7 +102,6 @@ func (d *DatabaseShortenerRepository) Create(originalURL string) (string, error)
 		return fmt.Sprintf("%s/%s", baseURL.ToString(), existingShortKey), ErrURLAlreadyExist
 	}
 
-	// Возврат других ошибок
 	return "", fmt.Errorf("%w", err)
 }
 
@@ -209,7 +208,7 @@ func (d *DatabaseShortenerRepository) close(ctx context.Context) error {
 func (d *DatabaseShortenerRepository) Migrate() error {
 	m, err := migrate.New("file://internal/migrations", d.databaseDNS)
 	if err != nil {
-		return ErrOpenMigrateFailed
+		return fmt.Errorf("%w: %v", ErrOpenMigrateFailed, err)
 	}
 
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
