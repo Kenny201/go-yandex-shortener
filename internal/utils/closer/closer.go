@@ -14,19 +14,19 @@ type closer func(ctx context.Context) error
 
 // Closer управляет списком функций-closer и предоставляет методы для их закрытия.
 type Closer struct {
-	closers  []closer      // Список функций-closer для вызова при закрытии
-	mu       sync.Mutex    // Мьютекс для потокобезопасного доступа к списку closers
-	isDone   chan struct{} // Канал для уведомления о завершении закрытия
-	isClosed bool          // Флаг, указывающий, был ли Closer уже закрыт
-	once     sync.Once     // Объект sync.Once для однократного вызова функции
+	closers  []closer
+	mu       sync.Mutex
+	isDone   chan struct{}
+	isClosed bool
+	once     sync.Once
 }
 
 // New создает и возвращает новый экземпляр Closer.
 func New() *Closer {
 	cl := &Closer{
-		closers:  []closer{},          // Инициализация пустого списка closer-ов
-		isDone:   make(chan struct{}), // Создание канала для уведомления о завершении
-		isClosed: false,               // Установка флага, что Closer еще не закрыт
+		closers:  []closer{},
+		isDone:   make(chan struct{}),
+		isClosed: false,
 	}
 
 	CL = cl // Установка глобальной переменной на созданный экземпляр
@@ -39,7 +39,6 @@ func (c *Closer) Add(cl closer) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Если Closer уже закрыт, новые closer-ы не добавляются
 	if c.isClosed {
 		return
 	}
@@ -57,14 +56,12 @@ func (c *Closer) Close(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Если Closer уже закрыт, ничего не делаем
 	if c.isClosed {
 		return nil
 	}
 
 	c.isClosed = true
 
-	// Закрытие канала isDone один раз
 	defer c.once.Do(func() {
 		close(c.isDone)
 	})
@@ -78,6 +75,5 @@ func (c *Closer) Close(ctx context.Context) error {
 		}
 	}
 
-	// Объединение и возврат всех ошибок
 	return errors.Join(resultErr...)
 }
