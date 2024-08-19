@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
+	"github.com/spf13/viper"
 
 	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
@@ -22,9 +22,12 @@ import (
 
 // setupTestEnvironment инициализирует окружение для теста.
 func setupTestEnvironment(t *testing.T) (*mocks.MockRepository, *gomock.Controller, *shortener.Shortener) {
+
+	args := initArgs(t)
+
 	ctrl := gomock.NewController(t)
 	mockRepository := mocks.NewMockRepository(ctrl)
-	shortenerService := shortener.New(mockRepository)
+	shortenerService := shortener.New(mockRepository, args.BaseURL)
 	return mockRepository, ctrl, shortenerService
 }
 
@@ -62,7 +65,7 @@ func TestPostHandler(t *testing.T) {
 			defer ctrl.Finish()
 
 			if tt.wantStatusCode == http.StatusCreated {
-				mockRepository.EXPECT().Create(tt.body).Return("some-short-url", nil)
+				mockRepository.EXPECT().Create(gomock.Any()).Return(nil, nil)
 			}
 
 			rw, req := sendRequest(http.MethodPost, "/", strings.NewReader(tt.body))
@@ -187,13 +190,8 @@ func TestPostAPIHandler(t *testing.T) {
 			mockRepository, ctrl, shortenerService := setupTestEnvironment(t)
 			defer ctrl.Finish()
 
-			var requestBody map[string]string
 			if tt.body != "" && tt.wantStatusCode == http.StatusCreated {
-				err := json.Unmarshal([]byte(tt.body), &requestBody)
-				if err == nil {
-					originalURL := requestBody["url"]
-					mockRepository.EXPECT().Create(originalURL).Return("some-short-url", nil)
-				}
+				mockRepository.EXPECT().Create(gomock.Any()).Return(nil, nil)
 			}
 
 			rw, req := sendRequest(http.MethodPost, args.BaseURL, strings.NewReader(tt.body))
@@ -322,16 +320,16 @@ func TestPostBatchHandler(t *testing.T) {
 
 func initArgs(t *testing.T) *config.Args {
 	t.Helper()
-	conf, err := config.LoadConfig("../../../")
+	err := config.LoadConfig("../../../")
 
 	if err != nil {
 		t.Errorf("error read config %v", err)
 	}
 
-	serverAddress := fmt.Sprintf(":%s", conf.Port)
-	baseURL := fmt.Sprintf("http://localhost:%s", conf.Port)
+	serverAddress := fmt.Sprintf(":%s", viper.GetString("SERVER_ADDRESS"))
+	baseURL := fmt.Sprintf("http://localhost:%s", viper.GetString("PORT"))
 	fileStoragePath := "tmp/Rquxc"
-	databaseDNS := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", conf.DBUsername, conf.DBPassword, conf.DBHost, conf.DBPort, conf.DBDatabase)
+	databaseDNS := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", viper.GetString("DB_USERNAME"), viper.GetString("DB_PASSWORD"), viper.GetString("DB_HOST"), viper.GetString("DB_PORT"), viper.GetString("DB_DATABASE"))
 
 	args := []string{
 		"-a", serverAddress,
@@ -340,7 +338,7 @@ func initArgs(t *testing.T) *config.Args {
 		"-d", databaseDNS,
 	}
 
-	a := config.NewArgs(conf)
+	a := config.NewArgs()
 	a.ParseFlags(args)
 
 	return a

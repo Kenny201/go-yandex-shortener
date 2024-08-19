@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -21,21 +20,18 @@ type Args struct {
 	BaseURL         string
 	FileStoragePath string
 	DatabaseDNS     string
-	config          *Config
 }
 
-func NewArgs(config *Config) *Args {
-	return &Args{
-		config: config,
-	}
+func NewArgs() *Args {
+	return &Args{}
 }
 
 // ParseFlags анализирует аргументы командной строки.
 func (a *Args) ParseFlags(args []string) {
 	fs := flag.NewFlagSet("args", flag.ContinueOnError)
 
-	fs.StringVar(&a.ServerAddress, "a", fmt.Sprintf(":%s", a.config.Port), infoServerAddress)
-	fs.StringVar(&a.BaseURL, "b", fmt.Sprintf("http://localhost:%s", a.config.Port), infoBaseURL)
+	fs.StringVar(&a.ServerAddress, "a", fmt.Sprintf(":%s", viper.GetString("APP_PORT")), infoServerAddress)
+	fs.StringVar(&a.BaseURL, "b", fmt.Sprintf("http://localhost:%s", viper.GetString("APP_PORT")), infoBaseURL)
 	fs.StringVar(&a.FileStoragePath, "f", "", infoFileStoragePath)
 	fs.StringVar(&a.DatabaseDNS, "d", "", infoDatabaseDNS)
 
@@ -57,33 +53,5 @@ func (a *Args) overrideWithEnvVars() {
 	}
 	if v := os.Getenv("DATABASE_DSN"); v != "" {
 		a.DatabaseDNS = v
-	}
-}
-
-// InitRepository инициализирует соответствующий репозиторий на основе предоставленных аргументов.
-func (a *Args) InitRepository() (shortener.Repository, error) {
-	switch {
-	case a.DatabaseDNS != "":
-		repo, err := storage.NewDatabaseShortenerRepository(a.BaseURL, a.DatabaseDNS)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize database repository: %w", err)
-		}
-
-		if err := repo.Migrate(); err != nil {
-			return nil, fmt.Errorf("failed to migrate database: %w", err)
-		}
-
-		return repo, nil
-
-	case a.FileStoragePath != "":
-		repo, err := storage.NewFileShortenerRepository(a.BaseURL, a.FileStoragePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize file repository: %w", err)
-		}
-
-		return repo, nil
-
-	default:
-		return storage.NewMemoryShortenerRepository(a.BaseURL), nil
 	}
 }

@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 // TestParseFlags проверяет, правильно ли парсятся флаги
@@ -31,22 +33,14 @@ func TestParseFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := &Config{Port: "8080"}
-			args := NewArgs(config)
-
+			args := NewArgs()
 			args.ParseFlags(tt.args)
 
-			if args.ServerAddress != tt.expected.ServerAddress {
-				t.Errorf("expected ServerAddress to be '%s', got '%s'", tt.expected.ServerAddress, args.ServerAddress)
-			}
-			if args.BaseURL != tt.expected.BaseURL {
-				t.Errorf("expected BaseURL to be '%s', got '%s'", tt.expected.BaseURL, args.BaseURL)
-			}
-			if args.FileStoragePath != tt.expected.FileStoragePath {
-				t.Errorf("expected FileStoragePath to be '%s', got '%s'", tt.expected.FileStoragePath, args.FileStoragePath)
-			}
-			if args.DatabaseDNS != tt.expected.DatabaseDNS {
-				t.Errorf("expected DatabaseDNS to be '%s', got '%s'", tt.expected.DatabaseDNS, args.DatabaseDNS)
+			t.Logf("Expected: %+v", tt.expected)
+			t.Logf("Got: %+v", *args)
+
+			if diff := cmp.Diff(tt.expected, *args); diff != "" {
+				t.Fatalf("unexpected config parameters (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -78,8 +72,7 @@ func TestOverrideWithEnvVars(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config := &Config{Port: "8080"}
-			args := NewArgs(config)
+			args := NewArgs()
 
 			for k, v := range tt.envVars {
 				os.Setenv(k, v)
@@ -88,17 +81,8 @@ func TestOverrideWithEnvVars(t *testing.T) {
 
 			args.ParseFlags([]string{})
 
-			if args.ServerAddress != tt.expected.ServerAddress {
-				t.Errorf("expected ServerAddress to be '%s', got '%s'", tt.expected.ServerAddress, args.ServerAddress)
-			}
-			if args.BaseURL != tt.expected.BaseURL {
-				t.Errorf("expected BaseURL to be '%s', got '%s'", tt.expected.BaseURL, args.BaseURL)
-			}
-			if args.FileStoragePath != tt.expected.FileStoragePath {
-				t.Errorf("expected FileStoragePath to be '%s', got '%s'", tt.expected.FileStoragePath, args.FileStoragePath)
-			}
-			if args.DatabaseDNS != tt.expected.DatabaseDNS {
-				t.Errorf("expected DatabaseDNS to be '%s', got '%s'", tt.expected.DatabaseDNS, args.DatabaseDNS)
+			if diff := cmp.Diff(tt.expected, *args); diff != "" {
+				t.Fatalf("unexpected config parameters (-want +got):\n%s", diff)
 			}
 		})
 	}

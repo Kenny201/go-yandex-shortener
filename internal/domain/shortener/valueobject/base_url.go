@@ -47,7 +47,7 @@ func (bu BaseURL) ToString() string {
 // ParseBaseURL парсит переданную строку URL на компоненты схема, хост и порт.
 // Входная строка должна быть в формате "scheme://host:port" или "host:port".
 func ParseBaseURL(s string) (map[string]string, error) {
-	parsedURL := make(map[string]string)
+	parsedURL := make(map[string]string, 3)
 
 	// Убедитесь, что строка URL имеет схему
 	if !strings.Contains(s, "://") {

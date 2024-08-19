@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 
@@ -23,8 +22,8 @@ func NewMemoryShortenerRepository(baseURL string) *MemoryShortenerRepository {
 }
 
 // Get возвращает URL-адрес по короткому ключу, если он существует.
-func (rm *MemoryShortenerRepository) Get(shortKey string) (*entity.URL, error) {
-	for _, v := range rm.urls {
+func (mr *MemoryShortenerRepository) Get(shortKey string) (*entity.URL, error) {
+	for _, v := range mr.urls {
 		if v.ShortKey == shortKey {
 			slog.Info("URL retrieved successfully", slog.String("shortKey", shortKey))
 			return &v, nil
@@ -34,33 +33,39 @@ func (rm *MemoryShortenerRepository) Get(shortKey string) (*entity.URL, error) {
 }
 
 // Create добавляет новый URL в репозиторий, если его еще нет.
-func (rm *MemoryShortenerRepository) Create(originalURL string) (string, error) {
-	shortURL, err := rm.findOrCreateURL(originalURL)
-	if err != nil {
-		return shortURL, err
+func (mr *MemoryShortenerRepository) Create(url *entity.URL) (*entity.URL, error) {
+	if v, exists := mr.urls[url.OriginalURL]; exists {
+		return &v, ErrURLAlreadyExist
 	}
-	slog.Info("URL created successfully", slog.String("originalURL", originalURL), slog.String("shortURL", shortURL))
-	return shortURL, nil
+
+	mr.urls[url.OriginalURL] = *url
+	return url, nil
 }
 
 // CreateList добавляет список новых URL в репозиторий, возвращая их сокращенные версии.
-func (rm *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error) {
-	if len(urls) == 0 {
-		return nil, ErrEmptyURL
+func (mr *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error) {
+	shortUrls := make([]*entity.URLItem, 0, len(urls))
+	baseURL, err := valueobject.NewBaseURL(mr.baseURL)
+
+	if err != nil {
+		return nil, err
 	}
 
-	shortUrls := make([]*entity.URLItem, 0, len(urls))
-
 	for _, urlItem := range urls {
-		shortURL, err := rm.findOrCreateURL(urlItem.OriginalURL)
-		if err != nil {
-			if errors.Is(err, ErrURLAlreadyExist) {
-				return []*entity.URLItem{{ID: urlItem.ID, ShortURL: shortURL}}, err
-			}
-			return nil, err
+		shortURL := valueobject.NewShortURL(baseURL)
+
+		if existingURL, exists := mr.urls[urlItem.OriginalURL]; exists {
+			return []*entity.URLItem{{ID: urlItem.ID, ShortURL: fmt.Sprintf("%s/%s", mr.baseURL, existingURL.ShortKey)}}, ErrURLAlreadyExist
 		}
 
-		shortUrls = append(shortUrls, &entity.URLItem{ID: urlItem.ID, ShortURL: shortURL})
+		urlEntity := entity.URL{
+			ID:          urlItem.ID,
+			ShortKey:    shortURL.ShortKey(),
+			OriginalURL: urlItem.OriginalURL,
+		}
+
+		shortUrls = append(shortUrls, &entity.URLItem{ID: urlEntity.ID, ShortURL: fmt.Sprintf("%s/%s", mr.baseURL, urlEntity.ShortKey)})
+		mr.urls[urlItem.OriginalURL] = urlEntity
 	}
 
 	slog.Info("All URLs created successfully", slog.Int("count", len(shortUrls)))
@@ -68,30 +73,10 @@ func (rm *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*enti
 }
 
 // CheckHealth проверяет состояние репозитория, возвращая ошибку, если он не инициализирован.
-func (rm *MemoryShortenerRepository) CheckHealth() error {
-	if rm.urls == nil {
+func (mr *MemoryShortenerRepository) CheckHealth() error {
+	if mr.urls == nil {
 		return fmt.Errorf("memory URLs structure is not initialized")
 	}
 	slog.Info("Memory repository health check passed")
 	return nil
-}
-
-// findOrCreateURL ищет существующий URL или создает новый, если его нет в репозитории.
-func (rm *MemoryShortenerRepository) findOrCreateURL(originalURL string) (string, error) {
-	baseURL, err := valueobject.NewBaseURL(rm.baseURL)
-	if err != nil {
-		return "", err
-	}
-
-	if value, exists := rm.urls[originalURL]; exists {
-		return fmt.Sprintf("%s/%s", baseURL.ToString(), value.ShortKey), ErrURLAlreadyExist
-	}
-
-	shortURL := valueobject.NewShortURL(baseURL)
-	urlEntity := entity.NewURL(originalURL, shortURL.ShortKey())
-
-	rm.urls[originalURL] = *urlEntity
-	slog.Info("URL added to memory repository", slog.String("originalURL", originalURL), slog.String("shortKey", urlEntity.ShortKey))
-
-	return shortURL.ToString(), nil
 }

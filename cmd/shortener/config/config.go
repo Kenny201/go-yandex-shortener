@@ -7,8 +7,7 @@ import (
 )
 
 var (
-	ErrReadConfig       = fmt.Errorf("unable to read config")
-	ErrUnmarshallConfig = fmt.Errorf("unable to unmarshall config")
+	ErrReadConfig = fmt.Errorf("unable to read config")
 )
 
 type Config struct {
@@ -21,7 +20,7 @@ type Config struct {
 	DBPassword string `mapstructure:"DB_PASSWORD"`
 }
 
-func LoadConfig(path string) (c *Config, err error) {
+func LoadConfig(path string) (err error) {
 	viper.AddConfigPath(path)
 	viper.SetConfigName(".env")
 	viper.SetConfigType("env")
@@ -29,14 +28,8 @@ func LoadConfig(path string) (c *Config, err error) {
 	err = viper.ReadInConfig()
 
 	if err != nil {
-		return nil, ErrReadConfig
+		return ErrReadConfig
 	}
 
-	err = viper.Unmarshal(&c)
-
-	if err != nil {
-		return nil, ErrUnmarshallConfig
-	}
-
-	return
+	return nil
 }
