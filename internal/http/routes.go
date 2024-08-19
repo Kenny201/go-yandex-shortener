@@ -21,6 +21,7 @@ func useRoutes(handler handler.Handler) *chi.Mux {
 
 	r.Route("/api", func(r chi.Router) {
 		r.Post("/shorten", handler.PostAPI)
+		r.Post("/shorten/batch", handler.PostBatch)
 	})
 
 	return r

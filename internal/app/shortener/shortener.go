@@ -6,8 +6,8 @@ import (
 
 type Repository interface {
 	Get(id string) (*entity.URL, error)
-	GetAll() map[string]*entity.URL
 	Create(originalURL string) (string, error)
+	CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error)
 	CheckHealth() error
 }
 
@@ -43,8 +43,15 @@ func (s *Shortener) CreateShortURL(originalURL string) (string, error) {
 	return shortURL, nil
 }
 
-func (s *Shortener) GetAllShortURL() map[string]*entity.URL {
-	return s.Repository.GetAll()
+func (s *Shortener) CreateListShortURL(listURL []*entity.URLItem) ([]*entity.URLItem, error) {
+	// Сохраняем ссылку в хранилище и получаем обратно
+	urls, err := s.Repository.CreateList(listURL)
+
+	if err != nil {
+		return urls, err
+	}
+
+	return urls, nil
 }
 
 func (s *Shortener) CheckHealth() error {

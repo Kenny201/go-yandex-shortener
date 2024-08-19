@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 )
 
 type (
@@ -55,6 +57,31 @@ func (sh Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 	JSONResponse(w, http.StatusCreated, Response{
 		Result: shortURL,
 	})
+}
+
+func (sh Handler) PostBatch(w http.ResponseWriter, r *http.Request) {
+	var requestBatch []*entity.URLItem
+
+	body, err := io.ReadAll(r.Body)
+
+	if err != nil {
+		ErrorJSONResponse(w, http.StatusBadRequest, FailedReadRequestBody, err.Error())
+		return
+	}
+
+	if err = json.Unmarshal(body, &requestBatch); err != nil {
+		ErrorJSONResponse(w, http.StatusBadRequest, FailedUnmarshall, err.Error())
+		return
+	}
+
+	urls, err := sh.shortenerService.CreateListShortURL(requestBatch)
+
+	if err != nil {
+		ErrorJSONResponse(w, http.StatusBadRequest, BadRequest, err.Error())
+		return
+	}
+
+	JSONResponse(w, http.StatusCreated, urls)
 }
 
 func ErrorJSONResponse(w http.ResponseWriter, code int, error string, message string) {

@@ -4,10 +4,16 @@ import (
 	"github.com/google/uuid"
 )
 
+type URLItem struct {
+	ID          string `json:"correlation_id"`
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url,omitempty"`
+}
+
 type URL struct {
 	ID          string `json:"uuid"`
-	ShortKey    string `json:"shortURL"`
-	OriginalURL string `json:"originalURL"`
+	ShortKey    string `json:"short_key"`
+	OriginalURL string `json:"original_url"`
 }
 
 func NewURL(originalURL string, shortKey string) *URL {

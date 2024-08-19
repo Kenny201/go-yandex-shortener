@@ -63,6 +63,21 @@ func (mr *MockRepositoryMockRecorder) Create(originalURL interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockRepository)(nil).Create), originalURL)
 }
 
+// CreateList mocks base method.
+func (m *MockRepository) CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateList", urls)
+	ret0, _ := ret[0].([]*entity.URLItem)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateList indicates an expected call of CreateList.
+func (mr *MockRepositoryMockRecorder) CreateList(urls interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateList", reflect.TypeOf((*MockRepository)(nil).CreateList), urls)
+}
+
 // Get mocks base method.
 func (m *MockRepository) Get(id string) (*entity.URL, error) {
 	m.ctrl.T.Helper()
@@ -76,18 +91,4 @@ func (m *MockRepository) Get(id string) (*entity.URL, error) {
 func (mr *MockRepositoryMockRecorder) Get(id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockRepository)(nil).Get), id)
-}
-
-// GetAll mocks base method.
-func (m *MockRepository) GetAll() map[string]*entity.URL {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAll")
-	ret0, _ := ret[0].(map[string]*entity.URL)
-	return ret0
-}
-
-// GetAll indicates an expected call of GetAll.
-func (mr *MockRepositoryMockRecorder) GetAll() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAll", reflect.TypeOf((*MockRepository)(nil).GetAll))
 }
