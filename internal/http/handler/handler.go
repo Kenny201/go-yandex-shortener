@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 )
 
 const (
@@ -26,19 +26,14 @@ var (
 )
 
 type (
-	ShortenerService interface {
-		CreateShortURL(url string) (string, error)
-		GetShortURL(url string) (*entity.URL, error)
-	}
-
 	Handler struct {
-		shortenerService ShortenerService
+		shortenerService shortener.Shortener
 	}
 )
 
-func New(ss ShortenerService) Handler {
+func New(ss *shortener.Shortener) Handler {
 	return Handler{
-		shortenerService: ss,
+		shortenerService: *ss,
 	}
 }
 
@@ -80,4 +75,14 @@ func (sh Handler) Post(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
+}
+
+func (sh Handler) Ping(w http.ResponseWriter, r *http.Request) {
+	if err := sh.shortenerService.CheckHealth(); err != nil {
+		http.Error(w, "Health check failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Pong"))
 }
