@@ -6,6 +6,8 @@ import (
 	"sync"
 )
 
+var CL *Closer
+
 type closer func(ctx context.Context) error
 
 // Closer is a helper to close multiple closers.
@@ -19,11 +21,15 @@ type Closer struct {
 
 // New creates a new Closer.
 func New() *Closer {
-	return &Closer{
+	cl := &Closer{
 		closers:  make([]closer, 0),
 		isDone:   make(chan struct{}),
 		isClosed: false,
 	}
+
+	CL = cl
+
+	return cl
 }
 
 // Add adds a closer to the Closer.
