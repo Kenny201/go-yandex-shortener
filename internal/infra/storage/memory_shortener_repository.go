@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
@@ -12,6 +13,7 @@ type MemoryShortenerRepository struct {
 	urls    map[string]entity.URL
 }
 
+// NewMemoryShortenerRepository создает новый репозиторий сокращения ссылок в памяти.
 func NewMemoryShortenerRepository(baseURL string) *MemoryShortenerRepository {
 	return &MemoryShortenerRepository{
 		baseURL: baseURL,
@@ -19,75 +21,62 @@ func NewMemoryShortenerRepository(baseURL string) *MemoryShortenerRepository {
 	}
 }
 
-func (rm *MemoryShortenerRepository) Get(shortKey string) (*entity.URL, error) {
-	for _, v := range rm.urls {
+// Get возвращает URL-адрес по короткому ключу, если он существует.
+func (mr *MemoryShortenerRepository) Get(shortKey string) (*entity.URL, error) {
+	for _, v := range mr.urls {
 		if v.ShortKey == shortKey {
+			slog.Info("URL retrieved successfully", slog.String("shortKey", shortKey))
 			return &v, nil
 		}
 	}
-
-	return nil, fmt.Errorf("url %v not found", shortKey)
+	return nil, fmt.Errorf("URL %v not found", shortKey)
 }
 
-// Create Добавить новый элемент
-func (rm *MemoryShortenerRepository) Create(originalURL string) (string, error) {
-	baseURL, err := valueobject.NewBaseURL(rm.baseURL)
-
-	if err != nil {
-		return "", err
+// Create добавляет новый URL в репозиторий, если его еще нет.
+func (mr *MemoryShortenerRepository) Create(url *entity.URL) (*entity.URL, error) {
+	if v, exists := mr.urls[url.OriginalURL]; exists {
+		return &v, ErrURLAlreadyExist
 	}
 
-	//  Проверка существования записи в мапе urls.
-	if value, ok := rm.urls[originalURL]; ok {
-		return fmt.Sprintf("%s/%s", baseURL.ToString(), value.ShortKey), nil
-	}
-
-	shortURL := valueobject.NewShortURL(baseURL)
-	urlEntity := entity.NewURL(originalURL, shortURL.ShortKey())
-
-	// Сохраняем ссылку в хранилище in-memory
-	rm.urls[urlEntity.OriginalURL] = *urlEntity
-
-	return shortURL.ToString(), nil
+	mr.urls[url.OriginalURL] = *url
+	return url, nil
 }
 
-func (rm *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error) {
-	baseURL, err := valueobject.NewBaseURL(rm.baseURL)
+// CreateList добавляет список новых URL в репозиторий, возвращая их сокращенные версии.
+func (mr *MemoryShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error) {
 	shortUrls := make([]*entity.URLItem, 0, len(urls))
+	baseURL, err := valueobject.NewBaseURL(mr.baseURL)
 
 	if err != nil {
 		return nil, err
 	}
 
-	for _, v := range urls {
-		//  Проверка существования записи в мапе urls.
-		if v, ok := rm.urls[v.OriginalURL]; ok {
-			shortUrls = append(
-				shortUrls,
-				&entity.URLItem{ID: v.ID, ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), v.ShortKey)},
-			)
-			continue
-		}
-
+	for _, urlItem := range urls {
 		shortURL := valueobject.NewShortURL(baseURL)
 
-		urlEntity := &entity.URL{ID: v.ID, ShortKey: shortURL.ShortKey(), OriginalURL: v.OriginalURL}
+		if existingURL, exists := mr.urls[urlItem.OriginalURL]; exists {
+			return []*entity.URLItem{{ID: urlItem.ID, ShortURL: fmt.Sprintf("%s/%s", mr.baseURL, existingURL.ShortKey)}}, ErrURLAlreadyExist
+		}
 
-		// Сохраняем ссылку в хранилище in-memory
-		rm.urls[urlEntity.OriginalURL] = *urlEntity
+		urlEntity := entity.URL{
+			ID:          urlItem.ID,
+			ShortKey:    shortURL.ShortKey(),
+			OriginalURL: urlItem.OriginalURL,
+		}
 
-		shortUrls = append(
-			shortUrls,
-			&entity.URLItem{ID: v.ID, ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), shortURL.ShortKey())},
-		)
+		shortUrls = append(shortUrls, &entity.URLItem{ID: urlEntity.ID, ShortURL: fmt.Sprintf("%s/%s", mr.baseURL, urlEntity.ShortKey)})
+		mr.urls[urlItem.OriginalURL] = urlEntity
 	}
 
+	slog.Info("All URLs created successfully", slog.Int("count", len(shortUrls)))
 	return shortUrls, nil
 }
 
-func (rm *MemoryShortenerRepository) CheckHealth() error {
-	if rm.urls == nil {
-		return fmt.Errorf("memory urls structure is not initialized")
+// CheckHealth проверяет состояние репозитория, возвращая ошибку, если он не инициализирован.
+func (mr *MemoryShortenerRepository) CheckHealth() error {
+	if mr.urls == nil {
+		return fmt.Errorf("memory URLs structure is not initialized")
 	}
+	slog.Info("Memory repository health check passed")
 	return nil
 }

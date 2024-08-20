@@ -12,52 +12,36 @@ import (
 )
 
 func TestGzipCompression(t *testing.T) {
-	responseBody := `{"url": "https://practicum.yandex.ru"}`
-	r := chi.NewRouter()
-	r.Use(Gzip)
+	t.Run("gzip is only encoding", func(t *testing.T) {
+		responseBody := `{"url": "https://practicum.yandex.ru"}`
+		r := chi.NewRouter()
+		r.Use(Gzip)
 
-	r.Get("/getjson", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(responseBody))
-	})
-
-	ts := httptest.NewServer(r)
-	defer ts.Close()
-
-	tests := []struct {
-		name              string
-		path              string
-		expectedEncoding  string
-		acceptedEncodings []string
-	}{
-		{
-			name:              "gzip is only encoding",
-			path:              "/getjson",
-			acceptedEncodings: []string{"gzip"},
-			expectedEncoding:  "gzip",
-		},
-	}
-
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			resp, respString := testRequestWithAcceptedEncodings(t, ts, "GET", tc.path, tc.acceptedEncodings...)
-			if respString != responseBody {
-				t.Errorf("response text doesn't match; expected:%q, got:%q", responseBody, respString)
-			}
-			if got := resp.Header.Get("Content-Encoding"); got != tc.expectedEncoding {
-				t.Errorf("expected encoding %q but got %q", tc.expectedEncoding, got)
-			}
-
-			defer resp.Body.Close()
+		r.Get("/getjson", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(responseBody))
 		})
-	}
+
+		ts := httptest.NewServer(r)
+		defer ts.Close()
+
+		resp, respString := testRequestWithAcceptedEncodings(t, ts, "GET", "/getjson", "gzip")
+
+		if respString != responseBody {
+			t.Errorf("response text doesn't match; expected:%q, got:%q", responseBody, respString)
+		}
+
+		if got := resp.Header.Get("Content-Encoding"); got != "gzip" {
+			t.Errorf("expected encoding %q but got %q", "gzip", got)
+		}
+
+		defer resp.Body.Close()
+	})
 }
 
 func testRequestWithAcceptedEncodings(t *testing.T, ts *httptest.Server, method, path string, encodings ...string) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, nil)
-
 	if err != nil {
 		t.Fatal(err)
 		return nil, ""
@@ -69,7 +53,6 @@ func testRequestWithAcceptedEncodings(t *testing.T, ts *httptest.Server, method,
 	}
 
 	resp, err := http.DefaultClient.Do(req)
-
 	if err != nil {
 		t.Fatal(err)
 		return nil, ""
@@ -92,7 +75,6 @@ func decodeResponseBody(t *testing.T, resp *http.Response) string {
 	}
 
 	respBody, err := io.ReadAll(reader)
-
 	if err != nil {
 		t.Fatal(err)
 		return ""

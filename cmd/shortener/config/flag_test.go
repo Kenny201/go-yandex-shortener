@@ -1,158 +1,89 @@
 package config
 
 import (
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"strings"
+	"os"
 	"testing"
 
-	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/http/handler"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
+	"github.com/google/go-cmp/cmp"
 )
 
-const (
-	URL = "http://localhost:8080"
-)
-
-func TestFlagsWithError(t *testing.T) {
+// TestParseFlags проверяет, правильно ли парсятся флаги
+func TestParseFlags(t *testing.T) {
 	tests := []struct {
-		name           string
-		body           string
-		args           []string
-		wantError      string
-		wantStatusCode int
+		name     string
+		args     []string
+		expected Args
 	}{
 		{
-			name: "incorrect base_url:not set scheme into argument shortener_base_url",
-			body: "https://yandex.ru",
+			name: "parse_flags_correctly",
 			args: []string{
-				"-a", "http://localhost:8080",
-				"-b", "://localhost:8080",
+				"-a=:8081",
+				"-b=http://localhost:8081",
+				"-f=/tmp/storage.txt",
+				"-d=postgres://user:pass@localhost/dbname",
 			},
-			wantError:      "failed to parse base url\n",
-			wantStatusCode: http.StatusBadRequest,
-		},
-		{
-			name: "incorrect base_url:not set port into argument shortener_base_url",
-			body: "https://practicum.yandex.ru",
-			args: []string{
-				"-a", "http://localhost:8080",
-				"-b", "http://localhost",
+			expected: Args{
+				ServerAddress:   ":8081",
+				BaseURL:         "http://localhost:8081",
+				FileStoragePath: "/tmp/storage.txt",
+				DatabaseDNS:     "postgres://user:pass@localhost/dbname",
 			},
-			wantError:      "failed to split host and port\n",
-			wantStatusCode: http.StatusBadRequest,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := initArgs(t, tt.args)
+			args := NewArgs()
+			args.ParseFlags(tt.args)
 
-			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
-			repository := storage.NewMemoryShortenerRepository(args.BaseURL)
-			linkShortener := shortener.New(repository)
+			t.Logf("Expected: %+v", tt.expected)
+			t.Logf("Got: %+v", *args)
 
-			handler.New(linkShortener).Post(rw, r)
-
-			res := rw.Result()
-			defer responseClose(t, res)
-
-			body, err := io.ReadAll(res.Body)
-
-			if err != nil {
-				t.Fatalf("could not read response:%v", err)
-			}
-
-			if string(body) != tt.wantError {
-				t.Errorf("error handler not correct: got %v want %v", string(body), tt.wantError)
-			}
-
-			if res.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status: got %v want %v", res.StatusCode, tt.wantStatusCode)
+			if diff := cmp.Diff(tt.expected, *args); diff != "" {
+				t.Fatalf("unexpected config parameters (-want +got):\n%s", diff)
 			}
 		})
 	}
 }
 
-func TestFlags(t *testing.T) {
+// TestOverrideWithEnvVars проверяет, переопределяют ли переменные среды флаги
+func TestOverrideWithEnvVars(t *testing.T) {
 	tests := []struct {
-		name           string
-		body           string
-		args           []string
-		wantStatusCode int
+		name     string
+		envVars  map[string]string
+		expected Args
 	}{
 		{
-			name: "set port 8080 into argument shortener_server_address",
-			body: "https://yandex.ru",
-			args: []string{
-				"-a", "http://localhost:8080",
-				"-b", "http://localhost:8080",
+			name: "override_flags_with_environment_variables",
+			envVars: map[string]string{
+				"SHORTENER_SERVER_ADDRESS": ":9090",
+				"SHORTENER_BASE_URL":       "http://localhost:9090",
+				"FILE_STORAGE_PATH":        "/data/storage.txt",
+				"DATABASE_DSN":             "postgres://user:pass@localhost/newdb",
 			},
-			wantStatusCode: http.StatusCreated,
-		},
-		{
-			name: "set port 8090 into argument shortener_server_address",
-			body: "https://yandex.ru",
-			args: []string{
-				"-a", "http://localhost:8090",
-				"-b", "http://localhost:8080",
+			expected: Args{
+				ServerAddress:   ":9090",
+				BaseURL:         "http://localhost:9090",
+				FileStoragePath: "/data/storage.txt",
+				DatabaseDNS:     "postgres://user:pass@localhost/newdb",
 			},
-			wantStatusCode: http.StatusCreated,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			args := initArgs(t, tt.args)
+			args := NewArgs()
 
-			rw, r := sendRequest(http.MethodPost, URL, strings.NewReader(tt.body))
-
-			repository := storage.NewMemoryShortenerRepository(args.BaseURL)
-			service := shortener.New(repository)
-
-			handler.New(service).Post(rw, r)
-
-			res := rw.Result()
-			defer responseClose(t, res)
-
-			_, err := io.ReadAll(res.Body)
-
-			if err != nil {
-				t.Fatalf("could not read response:%v", err)
+			for k, v := range tt.envVars {
+				os.Setenv(k, v)
 			}
+			defer os.Clearenv()
 
-			if res.StatusCode != tt.wantStatusCode {
-				t.Errorf("excpected status: got %v want %v", res.StatusCode, tt.wantStatusCode)
+			args.ParseFlags([]string{})
+
+			if diff := cmp.Diff(tt.expected, *args); diff != "" {
+				t.Fatalf("unexpected config parameters (-want +got):\n%s", diff)
 			}
 		})
 	}
-}
-
-func initArgs(t *testing.T, args []string) *Args {
-	t.Helper()
-	conf, err := LoadConfig("../../../")
-
-	if err != nil {
-		t.Errorf(err.Error())
-	}
-
-	a := NewArgs(conf)
-	a.ParseFlags(args)
-
-	return a
-}
-
-func responseClose(t *testing.T, response *http.Response) {
-	t.Helper()
-	err := response.Body.Close()
-	if err != nil {
-		t.Errorf("failed to close response body: %v", err.Error())
-	}
-}
-
-func sendRequest(method, url string, body io.Reader) (*httptest.ResponseRecorder, *http.Request) {
-	req := httptest.NewRequest(method, url, body)
-	return httptest.NewRecorder(), req
 }

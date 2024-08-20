@@ -49,18 +49,18 @@ func (mr *MockRepositoryMockRecorder) CheckHealth() *gomock.Call {
 }
 
 // Create mocks base method.
-func (m *MockRepository) Create(originalURL string) (string, error) {
+func (m *MockRepository) Create(url *entity.URL) (*entity.URL, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", originalURL)
-	ret0, _ := ret[0].(string)
+	ret := m.ctrl.Call(m, "Create", url)
+	ret0, _ := ret[0].(*entity.URL)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockRepositoryMockRecorder) Create(originalURL interface{}) *gomock.Call {
+func (mr *MockRepositoryMockRecorder) Create(url interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockRepository)(nil).Create), originalURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockRepository)(nil).Create), url)
 }
 
 // CreateList mocks base method.

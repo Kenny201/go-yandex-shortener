@@ -5,15 +5,15 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
+	"github.com/go-chi/chi/v5"
 )
 
 const (
 	FailedReadRequestBody = "failed reading request body"
-	FailedUnmarshall      = "failed unmarshall"
-	FailedMarshall        = "failed marshall"
+	FailedUnmarshall      = "failed to unmarshal request body"
+	FailedMarshall        = "failed to marshal response"
 	RequestBodyIsEmpty    = "request body is empty"
 	BadRequest            = "bad request"
 	URLFieldIsEmpty       = "the url field cannot be empty"
@@ -25,21 +25,23 @@ var (
 	ErrRequestBodyEmpty = errors.New(RequestBodyIsEmpty)
 )
 
-type (
-	Handler struct {
-		shortenerService shortener.Shortener
-	}
-)
+// Handler управляет HTTP-запросами, связанными с сокращением URL-адресов.
+type Handler struct {
+	shortenerService shortener.Shortener
+}
 
+// New создает новый экземпляр Handler с заданным сервисом сокращения URL.
 func New(ss *shortener.Shortener) Handler {
 	return Handler{
 		shortenerService: *ss,
 	}
 }
 
-func (sh Handler) Get(w http.ResponseWriter, r *http.Request) {
+// Get обрабатывает GET-запрос для получения оригинального URL по короткому ключу.
+// Возвращает 302 Redirect с заголовком Location.
+func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	url, err := sh.shortenerService.GetShortURL(id)
+	url, err := h.shortenerService.GetShortURL(id)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -50,10 +52,11 @@ func (sh Handler) Get(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (sh Handler) Post(w http.ResponseWriter, r *http.Request) {
-	var shortURL string
-
+// Post обрабатывает POST-запрос для создания короткого URL.
+// Ожидает URL в теле запроса и возвращает короткий URL или ошибку.
+func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
 
 	if err != nil {
 		http.Error(w, ErrReadAll.Error(), http.StatusBadRequest)
@@ -65,20 +68,27 @@ func (sh Handler) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err = sh.shortenerService.CreateShortURL(string(body))
+	shortURL, err := h.shortenerService.CreateShortURL(string(body))
 
 	if err != nil {
+		if errors.Is(err, storage.ErrURLAlreadyExist) {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(shortURL))
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(shortURL))
 }
 
-func (sh Handler) Ping(w http.ResponseWriter, r *http.Request) {
-	if err := sh.shortenerService.CheckHealth(); err != nil {
+// Ping обрабатывает запрос для проверки состояния сервиса.
+// Возвращает 200 OK если состояние сервиса в порядке, иначе 500 Internal Server Error.
+func (h Handler) Ping(w http.ResponseWriter, r *http.Request) {
+	if err := h.shortenerService.CheckHealth(); err != nil {
 		http.Error(w, "Health check failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

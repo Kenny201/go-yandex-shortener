@@ -7,6 +7,7 @@ import (
 type URLItem struct {
 	ID          string `json:"correlation_id"`
 	ShortURL    string `json:"short_url"`
+	ShortKey    string `json:"short_key,omitempty"`
 	OriginalURL string `json:"original_url,omitempty"`
 }
 
