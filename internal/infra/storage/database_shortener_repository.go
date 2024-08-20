@@ -19,7 +19,6 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/internal/utils/closer"
 )
 
-// Ошибки, возвращаемые репозиторием.
 var (
 	ErrOpenDatabaseFailed  = errors.New("unable to connect to database")
 	ErrCloseDatabaseFailed = errors.New("unable to close database connection")
@@ -40,7 +39,6 @@ type DatabaseShortenerRepository struct {
 // NewDatabaseShortenerRepository создает новый экземпляр DatabaseShortenerRepository и устанавливает подключение к базе данных.
 func NewDatabaseShortenerRepository(baseURL, databaseDNS string) (*DatabaseShortenerRepository, error) {
 	db, err := pgx.Connect(context.Background(), databaseDNS)
-
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrOpenDatabaseFailed, err)
 	}
@@ -59,12 +57,9 @@ func NewDatabaseShortenerRepository(baseURL, databaseDNS string) (*DatabaseShort
 // Get извлекает информацию о коротком URL из базы данных по короткому ключу.
 func (dr *DatabaseShortenerRepository) Get(shortKey string) (*entity.URL, error) {
 	url := &entity.URL{}
-
 	query := "SELECT id, short_key, original_url FROM shorteners WHERE short_key = $1"
 
-	err := dr.db.QueryRow(context.Background(), query, shortKey).Scan(&url.ID, &url.ShortKey, &url.OriginalURL)
-
-	if err != nil {
+	if err := dr.db.QueryRow(context.Background(), query, shortKey).Scan(&url.ID, &url.ShortKey, &url.OriginalURL); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, fmt.Errorf("URL %v not found", shortKey)
 		}
@@ -78,27 +73,22 @@ func (dr *DatabaseShortenerRepository) Get(shortKey string) (*entity.URL, error)
 // Create добавляет новый URL в базу данных.
 func (dr *DatabaseShortenerRepository) Create(url *entity.URL) (*entity.URL, error) {
 	query := "INSERT INTO shorteners (id, short_key, original_url) VALUES ($1, $2, $3)"
-
 	_, err := dr.db.Exec(context.Background(), query, url.ID, url.ShortKey, url.OriginalURL)
-
 	if err != nil {
-		if pgErr := handlePGError(err); pgErr != nil {
+		if pgErr := parsePGError(err); pgErr != nil {
 			return dr.handleDuplicateURL(url.OriginalURL)
 		}
 		return nil, err
 	}
-
 	return url, nil
 }
 
 // handleDuplicateURL обрабатывает ситуацию с дублирующимся URL.
 func (dr *DatabaseShortenerRepository) handleDuplicateURL(originalURL string) (*entity.URL, error) {
 	existingURL, err := dr.findExistingURL(originalURL)
-
 	if err != nil {
 		return nil, err
 	}
-
 	return existingURL, ErrURLAlreadyExist
 }
 
@@ -107,12 +97,9 @@ func (dr *DatabaseShortenerRepository) findExistingURL(originalURL string) (*ent
 	var existingURL entity.URL
 	query := "SELECT id, short_key, original_url FROM shorteners WHERE original_url = $1"
 
-	err := dr.db.QueryRow(context.Background(), query, originalURL).Scan(&existingURL.ID, &existingURL.ShortKey, &existingURL.OriginalURL)
-
-	if err != nil {
+	if err := dr.db.QueryRow(context.Background(), query, originalURL).Scan(&existingURL.ID, &existingURL.ShortKey, &existingURL.OriginalURL); err != nil {
 		return nil, err
 	}
-
 	return &existingURL, nil
 }
 
@@ -121,21 +108,20 @@ func (dr *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*en
 	if len(urls) == 0 {
 		return nil, ErrEmptyURL
 	}
-	baseURL, err := valueobject.NewBaseURL(dr.baseURL)
 
+	baseURL, err := valueobject.NewBaseURL(dr.baseURL)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		duplicates []*entity.URLItem
-		shortURLs  []*entity.URLItem
+		duplicates = make([]*entity.URLItem, 0, len(urls))
+		shortURLs  = make([]*entity.URLItem, 0, len(urls))
 		urlBatch   [][]interface{}
 	)
 
 	for _, urlItem := range urls {
 		existingURL, err := dr.findExistingURL(urlItem.OriginalURL)
-
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return nil, err
 		}
@@ -143,13 +129,13 @@ func (dr *DatabaseShortenerRepository) CreateList(urls []*entity.URLItem) ([]*en
 		if existingURL != nil {
 			duplicates = append(duplicates, &entity.URLItem{ID: existingURL.ID, ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), existingURL.ShortKey)})
 			return duplicates, ErrURLAlreadyExist
-		} else {
-			shortURL := valueobject.NewShortURL(baseURL)
-			urlItem.ShortKey = shortURL.ShortKey()
-			urlItem.ShortURL = fmt.Sprintf("%s/%s", baseURL.ToString(), urlItem.ShortKey)
-			urlBatch = append(urlBatch, []interface{}{urlItem.ID, urlItem.ShortKey, urlItem.OriginalURL})
-			shortURLs = append(shortURLs, &entity.URLItem{ID: urlItem.ID, ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), urlItem.ShortKey)})
 		}
+
+		shortURL := valueobject.NewShortURL(baseURL)
+		urlItem.ShortKey = shortURL.ShortKey()
+		urlItem.ShortURL = fmt.Sprintf("%s/%s", baseURL.ToString(), urlItem.ShortKey)
+		urlBatch = append(urlBatch, []interface{}{urlItem.ID, urlItem.ShortKey, urlItem.OriginalURL})
+		shortURLs = append(shortURLs, &entity.URLItem{ID: urlItem.ID, ShortURL: fmt.Sprintf("%s/%s", baseURL.ToString(), urlItem.ShortKey)})
 	}
 
 	if err := dr.copyURLsToDB(urlBatch); err != nil {
@@ -175,7 +161,7 @@ func (dr *DatabaseShortenerRepository) copyURLsToDB(urlBatch [][]interface{}) er
 
 // handleCopyError обрабатывает ошибки при копировании данных в базу данных.
 func (dr *DatabaseShortenerRepository) handleCopyError(err error, rowsCopied int64, expectedRows int) error {
-	if pgErr := handlePGError(err); pgErr != nil {
+	if pgErr := parsePGError(err); pgErr != nil {
 		return fmt.Errorf("%w for id: %v", ErrURLAlreadyExist, pgErr)
 	}
 	if int(rowsCopied) != expectedRows {
@@ -184,8 +170,7 @@ func (dr *DatabaseShortenerRepository) handleCopyError(err error, rowsCopied int
 	return fmt.Errorf("%w: %v", ErrCopyFrom, err)
 }
 
-// handlePGError обрабатывает ошибки Postgres.
-func handlePGError(err error) *pgconn.PgError {
+func parsePGError(err error) *pgconn.PgError {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 		return pgErr
