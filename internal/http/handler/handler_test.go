@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,18 +17,20 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage/repository"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/mocks"
 )
 
 // setupTestEnvironment инициализирует окружение для теста.
-func setupTestEnvironment(t *testing.T) (*mocks.MockRepository, *gomock.Controller, *shortener.Shortener) {
+func setupTestEnvironment(t *testing.T) (*mocks.MockShortenerRepository, *gomock.Controller, *shortener.Shortener) {
 
 	args := initArgs(t)
 
 	ctrl := gomock.NewController(t)
-	mockRepository := mocks.NewMockRepository(ctrl)
+	mockRepository := mocks.NewMockShortenerRepository(ctrl)
+
 	shortenerService := shortener.New(mockRepository, args.BaseURL)
+
 	return mockRepository, ctrl, shortenerService
 }
 
@@ -283,7 +286,7 @@ func TestPostBatchHandler(t *testing.T) {
 			mockReturnValue: []*entity.URLItem{
 				{ID: "1", ShortURL: "some-short-url-1"},
 			},
-			mockReturnError:         storage.ErrURLAlreadyExist,
+			mockReturnError:         repository.ErrURLAlreadyExist,
 			wantStatusCode:          http.StatusConflict,
 			wantResponseContentType: "application/json",
 			expectCreateListCalled:  true,
@@ -296,9 +299,9 @@ func TestPostBatchHandler(t *testing.T) {
 			defer ctrl.Finish()
 
 			if tt.expectCreateListCalled {
-				mockRepository.EXPECT().CreateList(gomock.Any()).Return(tt.mockReturnValue, tt.mockReturnError)
+				mockRepository.EXPECT().CreateList(nil, gomock.Any()).Return(tt.mockReturnValue, tt.mockReturnError)
 			} else {
-				mockRepository.EXPECT().CreateList(gomock.Any()).Times(0)
+				mockRepository.EXPECT().CreateList(nil, gomock.Any()).Times(0)
 			}
 
 			rw, req := sendRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(tt.body))

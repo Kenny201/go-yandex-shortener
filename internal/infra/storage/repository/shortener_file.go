@@ -1,4 +1,4 @@
-package storage
+package repository
 
 import (
 	"encoding/json"
@@ -20,15 +20,15 @@ var (
 	ErrCreateDir  = errors.New("failed to create or open directory")
 )
 
-type FileShortenerRepository struct {
+type ShortenerFile struct {
 	baseURL  string
 	filePath string
 	urls     map[string]entity.URL
 }
 
-// NewFileShortenerRepository создает новый репозиторий сокращения ссылок с сохранением данных в файл.
-func NewFileShortenerRepository(baseURL, filePath string) (*FileShortenerRepository, error) {
-	repo := &FileShortenerRepository{
+// NewShortenerFile создает новый репозиторий сокращения ссылок с сохранением данных в файл.
+func NewShortenerFile(baseURL, filePath string) (*ShortenerFile, error) {
+	repo := &ShortenerFile{
 		baseURL:  baseURL,
 		filePath: filePath,
 		urls:     make(map[string]entity.URL),
@@ -43,7 +43,7 @@ func NewFileShortenerRepository(baseURL, filePath string) (*FileShortenerReposit
 }
 
 // Get возвращает URL по короткому ключу, если он существует в файле.
-func (fr *FileShortenerRepository) Get(shortKey string) (*entity.URL, error) {
+func (fr ShortenerFile) Get(shortKey string) (*entity.URL, error) {
 	for _, v := range fr.urls {
 		if v.ShortKey == shortKey {
 			slog.Info("URL retrieved successfully", slog.String("shortKey", shortKey))
@@ -54,7 +54,7 @@ func (fr *FileShortenerRepository) Get(shortKey string) (*entity.URL, error) {
 }
 
 // Create добавляет новый URL в файл и возвращает его сокращенную версию.
-func (fr *FileShortenerRepository) Create(url *entity.URL) (*entity.URL, error) {
+func (fr ShortenerFile) Create(url *entity.URL) (*entity.URL, error) {
 	if existingURL := fr.findExistingURL(url.OriginalURL); existingURL != nil {
 		return existingURL, ErrURLAlreadyExist
 	}
@@ -69,7 +69,7 @@ func (fr *FileShortenerRepository) Create(url *entity.URL) (*entity.URL, error) 
 }
 
 // CreateList добавляет список новых URL в файл и возвращает их сокращенные версии.
-func (fr *FileShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity.URLItem, error) {
+func (fr ShortenerFile) CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error) {
 	shortUrls := make([]*entity.URLItem, 0, len(urls))
 
 	baseURL, err := valueobject.NewBaseURL(fr.baseURL)
@@ -87,6 +87,7 @@ func (fr *FileShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity
 
 		urlEntity := entity.URL{
 			ID:          urlItem.ID,
+			UserID:      userID,
 			ShortKey:    shortURL.ShortKey(),
 			OriginalURL: urlItem.OriginalURL,
 		}
@@ -103,8 +104,26 @@ func (fr *FileShortenerRepository) CreateList(urls []*entity.URLItem) ([]*entity
 	return shortUrls, nil
 }
 
+// GetAll получает все ссылки определённого пользователя
+func (fr ShortenerFile) GetAll(userID string) ([]*entity.URLItem, error) {
+	shortUrls := make([]*entity.URLItem, 0, len(fr.urls))
+
+	for _, urlItem := range fr.urls {
+		if urlItem.UserID == userID {
+			shortUrls = append(shortUrls, &entity.URLItem{ShortURL: fmt.Sprintf("%s/%s", fr.baseURL, urlItem.ShortKey), OriginalURL: urlItem.OriginalURL})
+		}
+	}
+
+	// Если ссылки не найдены
+	if len(shortUrls) == 0 {
+		return nil, fmt.Errorf("%w:%s", ErrUserListURL, userID)
+	}
+
+	return shortUrls, nil
+}
+
 // findOrCreateURL ищет существующий URL в файле или создает новый, если не найден.
-func (fr *FileShortenerRepository) findExistingURL(originalURL string) *entity.URL {
+func (fr ShortenerFile) findExistingURL(originalURL string) *entity.URL {
 	if url, exists := fr.urls[originalURL]; exists {
 		return &url
 	}
@@ -113,7 +132,7 @@ func (fr *FileShortenerRepository) findExistingURL(originalURL string) *entity.U
 }
 
 // saveURLToFile сохраняет новый URL в файл в формате JSON.
-func (fr *FileShortenerRepository) saveURLToFile(url entity.URL) error {
+func (fr ShortenerFile) saveURLToFile(url entity.URL) error {
 	if err := fr.makeDir(); err != nil {
 		return err
 	}
@@ -134,7 +153,7 @@ func (fr *FileShortenerRepository) saveURLToFile(url entity.URL) error {
 }
 
 // readAll читает все URL из файла и загружает их в память.
-func (fr *FileShortenerRepository) readAll() error {
+func (fr ShortenerFile) readAll() error {
 	if err := fr.makeDir(); err != nil {
 		return err
 	}
@@ -164,7 +183,7 @@ func (fr *FileShortenerRepository) readAll() error {
 }
 
 // makeDir создает директорию для хранения файла, если она не существует.
-func (fr *FileShortenerRepository) makeDir() error {
+func (fr ShortenerFile) makeDir() error {
 	folder := path.Dir(fr.filePath)
 	if _, err := os.Stat(folder); os.IsNotExist(err) {
 		if err := os.MkdirAll(folder, 0755); err != nil {
@@ -176,14 +195,14 @@ func (fr *FileShortenerRepository) makeDir() error {
 }
 
 // closeFile закрывает файл и логгирует ошибку, если она произошла.
-func (fr *FileShortenerRepository) closeFile(f *os.File) {
+func (fr ShortenerFile) closeFile(f *os.File) {
 	if err := f.Close(); err != nil {
 		slog.Error("Failed to close file", slog.String("filePath", fr.filePath), slog.String("error", err.Error()))
 	}
 }
 
 // CheckHealth проверяет состояние репозитория, проверяя наличие файла на диске.
-func (fr *FileShortenerRepository) CheckHealth() error {
+func (fr ShortenerFile) CheckHealth() error {
 	if _, err := os.Stat(fr.filePath); os.IsNotExist(err) {
 		return fmt.Errorf("file does not exist: %w", err)
 	}
