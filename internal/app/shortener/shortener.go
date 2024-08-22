@@ -64,11 +64,6 @@ func (s *Shortener) CreateShortURL(ctx context.Context, originalURL string) (str
 	}
 
 	urlEntity := entity.NewURL(userID, originalURL, shortURL.ShortKey())
-
-	if err != nil {
-		return "", err
-	}
-
 	shortURLStr := fmt.Sprintf("%s/%s", baseURL.ToString(), urlEntity.ShortKey)
 	url, err := s.repo.Create(urlEntity)
 
