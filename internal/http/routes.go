@@ -1,11 +1,9 @@
 package http
 
 import (
-	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
-
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http/handler"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
+	"github.com/go-chi/chi/v5"
 )
 
 func useRoutes(handler handler.Handler) *chi.Mux {
@@ -15,15 +13,14 @@ func useRoutes(handler handler.Handler) *chi.Mux {
 		middleware.Gzip,
 		middleware.Logger,
 	)
-	userID := uuid.New().String()
 
-	r.With(middleware.NewTokenMiddleware(userID)).Post("/", handler.Post)
+	r.With(middleware.AuthMiddleware()).Post("/", handler.Post)
 	r.Get("/{id}", handler.Get)
 	r.Get("/ping", handler.Ping)
 
-	r.With(middleware.NewTokenMiddleware(userID)).Route("/api", func(r chi.Router) {
-		r.Post("/shorten", handler.PostAPI)
-		r.Post("/shorten/batch", handler.PostBatch)
+	r.Route("/api", func(r chi.Router) {
+		r.With(middleware.AuthMiddleware()).Post("/shorten", handler.PostAPI)
+		r.With(middleware.AuthMiddleware()).Post("/shorten/batch", handler.PostBatch)
 		r.With(middleware.AuthCheckMiddleware()).Get("/user/urls", handler.GetAll)
 	})
 
