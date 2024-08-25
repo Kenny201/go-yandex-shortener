@@ -15,6 +15,6 @@ func NewMemoryRepositories(baseURL string) *MemoryRepository {
 	}
 }
 
-func (r *MemoryRepository) GetShortenRepository() shortener.ShortenerRepository {
+func (r *MemoryRepository) GetShortenerRepository() shortener.ShortenerRepository {
 	return r.shortener
 }

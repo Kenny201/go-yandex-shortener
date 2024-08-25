@@ -5,5 +5,5 @@ import (
 )
 
 type Repository interface {
-	GetShortenRepository() shortener.ShortenerRepository
+	GetShortenerRepository() shortener.ShortenerRepository
 }

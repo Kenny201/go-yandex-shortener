@@ -37,7 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	shortenerService := shortener.New(repository.GetShortenRepository(), args.BaseURL)
+	shortenerService := shortener.New(repository.GetShortenerRepository(), args.BaseURL)
 
 	urlHandler := handler.New(shortenerService)
 

@@ -85,6 +85,6 @@ func (d *DatabaseRepositories) Migrate() error {
 	return nil
 }
 
-func (d *DatabaseRepositories) GetShortenRepository() shortener.ShortenerRepository {
+func (d *DatabaseRepositories) GetShortenerRepository() shortener.ShortenerRepository {
 	return d.shortener
 }

@@ -21,6 +21,6 @@ func NewFileRepositories(baseURL string, filePath string) (*FileRepository, erro
 	}, nil
 }
 
-func (r *FileRepository) GetShortenRepository() shortener.ShortenerRepository {
+func (r *FileRepository) GetShortenerRepository() shortener.ShortenerRepository {
 	return r.shortener
 }
