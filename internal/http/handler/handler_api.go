@@ -4,13 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"log/slog"
-	"net/http"
-
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage/repository"
+	"io"
+	"log/slog"
+	"net/http"
 )
 
 // ErrorResponse представляет формат ответа об ошибке.
@@ -137,6 +136,35 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Successfully fetched URLs for user", slog.String("userID", userID))
 	respondWithJSON(w, http.StatusOK, urls)
+}
+
+func (h Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	// Получаем userID из контекста
+	userID, ok := r.Context().Value(middleware.UserIDContextKey).(string)
+	if !ok || userID == "" {
+		slog.Warn("Unauthorized access attempt: userID not found or empty")
+		respondWithError(w, http.StatusUnauthorized, "", "")
+		return
+	}
+	// Чтение всего тела запроса
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+	// Объявляем переменную для хранения данных в виде слайса строк
+	var lines []string
+
+	// Парсим JSON в слайс строк
+	if err := json.Unmarshal(body, &lines); err != nil {
+		http.Error(w, "Failed to parse JSON", http.StatusBadRequest)
+		return
+	}
+	err = h.shortenerService.Delete(lines)
+
+	slog.Info("Successfully deleted URLs for user", slog.String("userID", userID))
+	respondWithJSON(w, http.StatusAccepted, nil)
 }
 
 // respondWithError отправляет ответ об ошибке в формате JSON.

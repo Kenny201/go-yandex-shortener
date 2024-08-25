@@ -122,6 +122,30 @@ func (fr ShortenerFile) GetAll(userID string) ([]*entity.URLItem, error) {
 	return shortUrls, nil
 }
 
+// MarkAsDeleted устанавливает поле IsDeleted в true для списка URL по коротким ключам.
+func (fr ShortenerFile) MarkAsDeleted(shortKeys []string) error {
+	if len(shortKeys) == 0 {
+		return fmt.Errorf("empty shortKey list provided")
+	}
+
+	for _, shortKey := range shortKeys {
+		for originalURL, url := range fr.urls {
+			if url.ShortKey == shortKey && !url.DeletedFlag {
+				url.DeletedFlag = true
+				fr.urls[originalURL] = url
+
+				if err := fr.saveURLToFile(url); err != nil {
+					return err
+				}
+
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
 // findOrCreateURL ищет существующий URL в файле или создает новый, если не найден.
 func (fr ShortenerFile) findExistingURL(originalURL string) *entity.URL {
 	if url, exists := fr.urls[originalURL]; exists {

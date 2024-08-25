@@ -91,6 +91,26 @@ func (mr ShortenerMemory) GetAll(userID string) ([]*entity.URLItem, error) {
 	return shortUrls, nil
 }
 
+// MarkAsDeleted устанавливает поле IsDeleted в true для списка URL по коротким ключам.
+func (mr ShortenerMemory) MarkAsDeleted(shortKeys []string) error {
+	if len(shortKeys) == 0 {
+		return fmt.Errorf("empty shortKey list provided")
+	}
+
+	// Обновление записей по ключам.
+	for _, shortKey := range shortKeys {
+		for originalURL, url := range mr.urls {
+			if url.ShortKey == shortKey && !url.DeletedFlag {
+				url.DeletedFlag = true
+				mr.urls[originalURL] = url
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
 // CheckHealth проверяет состояние репозитория, возвращая ошибку, если он не инициализирован.
 func (mr ShortenerMemory) CheckHealth() error {
 	if mr.urls == nil {

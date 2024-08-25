@@ -22,6 +22,7 @@ func useRoutes(handler handler.Handler) *chi.Mux {
 		r.With(middleware.AuthMiddleware()).Post("/shorten", handler.PostAPI)
 		r.With(middleware.AuthMiddleware()).Post("/shorten/batch", handler.PostBatch)
 		r.With(middleware.AuthCheckMiddleware()).Get("/user/urls", handler.GetAll)
+		r.With(middleware.AuthCheckMiddleware()).Delete("/user/urls", handler.Delete)
 	})
 
 	return r

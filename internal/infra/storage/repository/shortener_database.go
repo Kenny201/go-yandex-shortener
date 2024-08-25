@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"log/slog"
+	"sync"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/jackc/pgerrcode"
@@ -29,15 +31,14 @@ var (
 	ErrUserListURL         = errors.New("no short URLs found for repository ID: %s")
 )
 
-// ShortenerDatabase предоставляет методы для работы с URL-ами в базе данных.
 type ShortenerDatabase struct {
-	db          *pgx.Conn
+	db          *pgxpool.Pool
 	databaseDNS string
 	baseURL     string
 }
 
 // NewShortenerDatabase создает новый экземпляр ShortenerDatabase и устанавливает подключение к базе данных.
-func NewShortenerDatabase(baseURL string, db *pgx.Conn) ShortenerDatabase {
+func NewShortenerDatabase(baseURL string, db *pgxpool.Pool) ShortenerDatabase {
 	repo := ShortenerDatabase{
 		db:      db,
 		baseURL: baseURL,
@@ -173,6 +174,101 @@ func (dr ShortenerDatabase) GetAll(userID string) ([]*entity.URLItem, error) {
 	return shortURLs, nil
 }
 
+// MarkAsDeleted обновляет поле is_deleted на true для списка коротких URL.
+func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string) error {
+	if len(shortKeys) == 0 {
+		return fmt.Errorf("empty URL list provided")
+	}
+
+	const batchSize = 10                                       // Размер батча для обновлений
+	numBatches := (len(shortKeys) + batchSize - 1) / batchSize // Количество батчей
+
+	// Канал для передачи батчей URL
+	batchChan := make(chan []string, numBatches)
+	errorsChan := make(chan error, numBatches)
+	var wg sync.WaitGroup
+
+	// Создание и запуск воркеров
+	for i := 0; i < numBatches; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			slog.Info("Worker started", slog.Int("workerID", workerID))
+			dr.processBatchUpdates(batchChan, errorsChan, workerID)
+			slog.Info("Worker finished", slog.Int("workerID", workerID))
+		}(i)
+	}
+
+	// Разделение shortKeys на батчи и отправка в batchChan
+	go func() {
+		for i := 0; i < len(shortKeys); i += batchSize {
+			end := i + batchSize
+			if end > len(shortKeys) {
+				end = len(shortKeys)
+			}
+			batchChan <- shortKeys[i:end]
+		}
+		close(batchChan)
+	}()
+
+	// Закрытие канала ошибок после завершения всех воркеров
+	go func() {
+		wg.Wait()
+		close(errorsChan)
+	}()
+
+	// Сбор ошибок
+	var allErrors []error
+	for err := range errorsChan {
+		if err != nil {
+			slog.Error("Error processing batch", slog.String("error", err.Error()))
+			allErrors = append(allErrors, err)
+		}
+	}
+
+	if len(allErrors) > 0 {
+		return fmt.Errorf("one or more errors occurred: %v", allErrors)
+	}
+
+	slog.Info("All batches processed successfully")
+	return nil
+}
+
+// processBatchUpdates обрабатывает обновления URL в батчах.
+func (dr ShortenerDatabase) processBatchUpdates(batchChan <-chan []string, errorsChan chan<- error, workerID int) {
+	for batch := range batchChan {
+		slog.Info("Worker processing batch", slog.Int("workerID", workerID), slog.Int("batchSize", len(batch)))
+		batchObj := &pgx.Batch{}
+
+		for _, key := range batch {
+			slog.Debug("Worker queueing URL", slog.Int("workerID", workerID), slog.String("shortKey", key))
+			query := "UPDATE shorteners SET is_deleted = true WHERE short_key = $1"
+			batchObj.Queue(query, key)
+		}
+
+		if err := dr.executeBatch(batchObj); err != nil {
+			errorsChan <- err
+		}
+	}
+}
+
+// executeBatch выполняет пакетный запрос и передает ошибки в errorsChan.
+func (dr ShortenerDatabase) executeBatch(batch *pgx.Batch) error {
+	br := dr.db.SendBatch(context.Background(), batch)
+	defer br.Close()
+
+	for i := 0; i < batch.Len(); i++ {
+		tag, err := br.Exec()
+		if err != nil {
+			return fmt.Errorf("failed to update URL: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return fmt.Errorf("no rows affected for URL")
+		}
+	}
+	return nil
+}
+
 // copyURLsToDB копирует данные URL в базу данных с использованием CopyFrom.
 func (dr ShortenerDatabase) copyURLsToDB(urlBatch [][]interface{}) error {
 	rowsCopied, err := dr.db.CopyFrom(
@@ -203,16 +299,6 @@ func parsePGError(err error) *pgconn.PgError {
 	if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 		return pgErr
 	}
-	return nil
-}
-
-// close закрывает соединение с базой данных.
-func (dr ShortenerDatabase) close(ctx context.Context) error {
-	if err := dr.db.Close(ctx); err != nil {
-		slog.Error(ErrCloseDatabaseFailed.Error(), slog.String("error", err.Error()))
-		return err
-	}
-	slog.Info("Database connection gracefully closed")
 	return nil
 }
 

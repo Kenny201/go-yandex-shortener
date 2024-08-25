@@ -17,6 +17,7 @@ type URL struct {
 	UserID      interface{} `json:"user_id"`
 	ShortKey    string      `json:"short_key"`
 	OriginalURL string      `json:"original_url"`
+	DeletedFlag bool        `json:"is_deleted"`
 }
 
 func NewURL(userID interface{}, originalURL string, shortKey string) *URL {

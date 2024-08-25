@@ -4,53 +4,63 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
-	"log/slog"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"sync"
-
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/jackc/pgx/v5"
+	"time"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage/repository"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/utils/closer"
+	"github.com/golang-migrate/migrate/v4"
+	"log/slog"
 )
 
 var (
+	ErrOpenDatabaseFailed  = errors.New("unable to open database connection")
 	ErrCloseDatabaseFailed = errors.New("unable to close database connection")
+	Err                    = errors.New("error")
 )
+
+// singletonDBPool - пул подключений к базе данных.
+var singletonDBPool *pgxpool.Pool
+var mu sync.Mutex
 
 type DatabaseRepositories struct {
 	shortener   shortener.ShortenerRepository
-	db          *pgx.Conn
+	db          *pgxpool.Pool
 	databaseDNS string
 }
-
-// Singleton для хранения единственного экземпляра подключения
-var (
-	singletonDBConn *pgx.Conn
-	mu              sync.Mutex
-)
 
 func NewDatabaseRepositories(baseURL string, databaseDNS string) (*DatabaseRepositories, error) {
 	mu.Lock()
 	defer mu.Unlock()
 
 	// Проверяем, существует ли уже подключение
-	if singletonDBConn == nil {
-		db, err := pgx.Connect(context.Background(), databaseDNS)
+	if singletonDBPool == nil {
+		config, err := pgxpool.ParseConfig(databaseDNS)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %v", repository.ErrOpenDatabaseFailed, err)
+			return nil, fmt.Errorf("%w: %v", Err, err)
+		}
+
+		// Настройка параметров пула
+		config.MaxConns = 100                    // Максимальное количество соединений
+		config.MinConns = 10                     // Минимальное количество соединений
+		config.MaxConnIdleTime = 5 * time.Minute // Время ожидания неактивного соединения
+		config.MaxConnLifetime = 1 * time.Hour   // Время жизни соединения
+
+		dbPool, err := pgxpool.NewWithConfig(context.Background(), config)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrOpenDatabaseFailed, err)
 		}
 
 		// Если подключение успешно, сохраняем его в singleton
-		singletonDBConn = db
+		singletonDBPool = dbPool
 	}
 
-	// Создаем репозитории с уже существующим подключением
+	// Создаем репозитории с уже существующим пулом
 	d := &DatabaseRepositories{
-		shortener:   repository.NewShortenerDatabase(baseURL, singletonDBConn),
-		db:          singletonDBConn,
+		shortener:   repository.NewShortenerDatabase(baseURL, singletonDBPool),
+		db:          singletonDBPool,
 		databaseDNS: databaseDNS,
 	}
 
@@ -60,14 +70,11 @@ func NewDatabaseRepositories(baseURL string, databaseDNS string) (*DatabaseRepos
 	return d, nil
 }
 
-// Close Метод для закрытия соединения
+// Close закрывает соединение с базой данных.
 func (d *DatabaseRepositories) Close(ctx context.Context) error {
-	if d.db != nil {
-		if err := d.db.Close(ctx); err != nil {
-			return fmt.Errorf("%w: %v", ErrCloseDatabaseFailed, err)
-		}
-		d.db = nil
-	}
+	// Закрытие пула подключений, ошибки не возвращаются
+	singletonDBPool.Close()
+	slog.Info("Database connection gracefully closed")
 	return nil
 }
 
