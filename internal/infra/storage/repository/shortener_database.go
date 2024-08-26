@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"log/slog"
+	"runtime"
 	"sync"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -180,8 +181,8 @@ func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string) error {
 		return fmt.Errorf("empty URL list provided")
 	}
 
-	const batchSize = 10                                       // Размер батча для обновлений
-	numBatches := (len(shortKeys) + batchSize - 1) / batchSize // Количество батчей
+	const batchSize = 10           // Размер батча для обновлений
+	numBatches := runtime.NumCPU() // Количество батчей
 
 	// Канал для передачи батчей URL
 	batchChan := make(chan []string, numBatches)
