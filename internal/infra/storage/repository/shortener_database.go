@@ -188,10 +188,10 @@ func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string) error {
 	batchChan := make(chan []string, numBatches)
 	errorsChan := make(chan error, numBatches)
 	var wg sync.WaitGroup
+	wg.Add(numBatches)
 
 	// Создание и запуск воркеров
 	for i := 0; i < numBatches; i++ {
-		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
 			slog.Info("Worker started", slog.Int("workerID", workerID))
