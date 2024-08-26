@@ -68,6 +68,7 @@ func (d *DatabaseRepositories) Close(ctx context.Context) error {
 		}
 		d.db = nil
 	}
+	slog.Info("Database connection gracefully closed")
 	return nil
 }
 
