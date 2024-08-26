@@ -4,15 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"log/slog"
-	"runtime"
-	"sync"
-
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/sync/errgroup"
+	"log/slog"
+	"runtime"
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -182,53 +181,51 @@ func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string) error {
 	}
 
 	const batchSize = 10           // Размер батча для обновлений
-	numBatches := runtime.NumCPU() // Количество батчей
+	numBatches := runtime.NumCPU() // Количество воркеров
+
+	// Создание группы ошибок
+	eg := new(errgroup.Group)
 
 	// Канал для передачи батчей URL
 	batchChan := make(chan []string, numBatches)
-	errorsChan := make(chan error, numBatches)
-	var wg sync.WaitGroup
-	wg.Add(numBatches)
 
-	// Создание и запуск воркеров
+	// Канал для сигнализации о завершении работы
+	doneChan := make(chan struct{})
+	defer close(doneChan) // Гарантированное закрытие канала при выходе
+
+	// Запуск воркеров с использованием errgroup
 	for i := 0; i < numBatches; i++ {
-		go func(workerID int) {
-			defer wg.Done()
+		workerID := i // Локальная переменная, чтобы избежать захвата
+		eg.Go(func() error {
 			slog.Info("Worker started", slog.Int("workerID", workerID))
-			dr.processBatchUpdates(batchChan, errorsChan, workerID)
+			err := dr.processBatchUpdates(batchChan, doneChan, workerID)
 			slog.Info("Worker finished", slog.Int("workerID", workerID))
-		}(i)
+			return err
+		})
 	}
 
-	// Разделение shortKeys на батчи и отправка в batchChan
+	// Запуск горутины для наполнения batchChan (Fan-In)
 	go func() {
 		for i := 0; i < len(shortKeys); i += batchSize {
 			end := i + batchSize
 			if end > len(shortKeys) {
 				end = len(shortKeys)
 			}
-			batchChan <- shortKeys[i:end]
+			select {
+			case batchChan <- shortKeys[i:end]:
+				// Отправка батча
+			case <-doneChan:
+				// Завершение работы
+				return
+			}
 		}
 		close(batchChan)
 	}()
 
-	// Закрытие канала ошибок после завершения всех воркеров
-	go func() {
-		wg.Wait()
-		close(errorsChan)
-	}()
-
-	// Сбор ошибок
-	var allErrors []error
-	for err := range errorsChan {
-		if err != nil {
-			slog.Error("Error processing batch", slog.String("error", err.Error()))
-			allErrors = append(allErrors, err)
-		}
-	}
-
-	if len(allErrors) > 0 {
-		return fmt.Errorf("one or more errors occurred: %v", allErrors)
+	// Ожидание завершения всех воркеров и обработки ошибок
+	if err := eg.Wait(); err != nil {
+		slog.Error("Error occurred during batch processing", slog.String("error", err.Error()))
+		return fmt.Errorf("one or more errors occurred: %v", err)
 	}
 
 	slog.Info("All batches processed successfully")
@@ -236,19 +233,31 @@ func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string) error {
 }
 
 // processBatchUpdates обрабатывает обновления URL в батчах.
-func (dr ShortenerDatabase) processBatchUpdates(batchChan <-chan []string, errorsChan chan<- error, workerID int) {
-	for batch := range batchChan {
-		slog.Info("Worker processing batch", slog.Int("workerID", workerID), slog.Int("batchSize", len(batch)))
-		batchObj := &pgx.Batch{}
+func (dr ShortenerDatabase) processBatchUpdates(batchChan <-chan []string, doneChan <-chan struct{}, workerID int) error {
+	for {
+		select {
+		case batch, ok := <-batchChan:
+			if !ok {
+				return nil // Канал закрыт, обработка завершена
+			}
 
-		for _, key := range batch {
-			slog.Debug("Worker queueing URL", slog.Int("workerID", workerID), slog.String("shortKey", key))
-			query := "UPDATE shorteners SET is_deleted = true WHERE short_key = $1"
-			batchObj.Queue(query, key)
-		}
+			slog.Info("Worker processing batch", slog.Int("workerID", workerID), slog.Int("batchSize", len(batch)))
+			batchObj := &pgx.Batch{}
 
-		if err := dr.executeBatch(batchObj); err != nil {
-			errorsChan <- err
+			for _, key := range batch {
+				slog.Debug("Worker queueing URL", slog.Int("workerID", workerID), slog.String("shortKey", key))
+				query := "UPDATE shorteners SET is_deleted = true WHERE short_key = $1"
+				batchObj.Queue(query, key)
+			}
+
+			if err := dr.executeBatch(batchObj); err != nil {
+				return err // Возвращаем ошибку, чтобы она была обработана errgroup
+			}
+
+		case <-doneChan:
+			// Завершение работы, если doneChan закрыт
+			slog.Info("Worker received done signal", slog.Int("workerID", workerID))
+			return nil
 		}
 	}
 }

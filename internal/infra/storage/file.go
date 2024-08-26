@@ -17,7 +17,7 @@ func NewFileRepositories(baseURL string, filePath string) (*FileRepository, erro
 	}
 
 	return &FileRepository{
-		shortener: *shortenerFile,
+		shortener: shortenerFile,
 	}, nil
 }
 

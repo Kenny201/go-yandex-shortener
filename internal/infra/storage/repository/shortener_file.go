@@ -1,16 +1,20 @@
 package repository
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"log/slog"
 	"os"
 	"path"
-
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
+	"runtime"
+	"strings"
+	"sync"
 )
 
 var (
@@ -24,6 +28,7 @@ type ShortenerFile struct {
 	baseURL  string
 	filePath string
 	urls     map[string]entity.URL
+	mu       sync.RWMutex
 }
 
 // NewShortenerFile создает новый репозиторий сокращения ссылок с сохранением данных в файл.
@@ -43,7 +48,7 @@ func NewShortenerFile(baseURL, filePath string) (*ShortenerFile, error) {
 }
 
 // Get возвращает URL по короткому ключу, если он существует в файле.
-func (fr ShortenerFile) Get(shortKey string) (*entity.URL, error) {
+func (fr *ShortenerFile) Get(shortKey string) (*entity.URL, error) {
 	for _, v := range fr.urls {
 		if v.ShortKey == shortKey {
 			slog.Info("URL retrieved successfully", slog.String("shortKey", shortKey))
@@ -54,7 +59,7 @@ func (fr ShortenerFile) Get(shortKey string) (*entity.URL, error) {
 }
 
 // Create добавляет новый URL в файл и возвращает его сокращенную версию.
-func (fr ShortenerFile) Create(url *entity.URL) (*entity.URL, error) {
+func (fr *ShortenerFile) Create(url *entity.URL) (*entity.URL, error) {
 	if existingURL := fr.findExistingURL(url.OriginalURL); existingURL != nil {
 		return existingURL, ErrURLAlreadyExist
 	}
@@ -69,7 +74,7 @@ func (fr ShortenerFile) Create(url *entity.URL) (*entity.URL, error) {
 }
 
 // CreateList добавляет список новых URL в файл и возвращает их сокращенные версии.
-func (fr ShortenerFile) CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error) {
+func (fr *ShortenerFile) CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error) {
 	shortUrls := make([]*entity.URLItem, 0, len(urls))
 
 	baseURL, err := valueobject.NewBaseURL(fr.baseURL)
@@ -105,7 +110,7 @@ func (fr ShortenerFile) CreateList(userID interface{}, urls []*entity.URLItem) (
 }
 
 // GetAll получает все ссылки определённого пользователя
-func (fr ShortenerFile) GetAll(userID string) ([]*entity.URLItem, error) {
+func (fr *ShortenerFile) GetAll(userID string) ([]*entity.URLItem, error) {
 	shortUrls := make([]*entity.URLItem, 0, len(fr.urls))
 
 	for _, urlItem := range fr.urls {
@@ -122,32 +127,118 @@ func (fr ShortenerFile) GetAll(userID string) ([]*entity.URLItem, error) {
 	return shortUrls, nil
 }
 
-// MarkAsDeleted устанавливает поле IsDeleted в true для списка URL по коротким ключам.
-func (fr ShortenerFile) MarkAsDeleted(shortKeys []string) error {
+// MarkAsDeleted обновляет поле IsDeleted в true для списка URL по коротким ключам.
+func (fr *ShortenerFile) MarkAsDeleted(shortKeys []string) error {
 	if len(shortKeys) == 0 {
-		return fmt.Errorf("empty shortKey list provided")
+		return fmt.Errorf("empty URL list provided")
 	}
 
-	for _, shortKey := range shortKeys {
-		for originalURL, url := range fr.urls {
-			if url.ShortKey == shortKey && !url.DeletedFlag {
-				url.DeletedFlag = true
-				fr.urls[originalURL] = url
+	const batchSize = 10           // Размер батча для обновлений
+	numBatches := runtime.NumCPU() // Количество воркеров
 
-				if err := fr.saveURLToFile(url); err != nil {
-					return err
-				}
+	// Создание группы ошибок и канала для передачи батчей URL
+	eg := new(errgroup.Group)
+	batchChan := make(chan []string, numBatches)
 
-				break
+	// Запуск воркеров с использованием errgroup
+	for i := 0; i < numBatches; i++ {
+		eg.Go(func() error {
+			return fr.processBatchUpdates(batchChan)
+		})
+	}
+
+	// Наполнение batchChan и закрытие канала
+	go func() {
+		for i := 0; i < len(shortKeys); i += batchSize {
+			end := i + batchSize
+			if end > len(shortKeys) {
+				end = len(shortKeys)
 			}
+			batchChan <- shortKeys[i:end]
 		}
+		close(batchChan)
+	}()
+
+	// Ожидание завершения всех воркеров и обработки ошибок
+	if err := eg.Wait(); err != nil {
+		return fmt.Errorf("one or more errors occurred: %v", err)
 	}
 
 	return nil
 }
 
+// processBatchUpdates обрабатывает обновления URL в батчах.
+func (fr *ShortenerFile) processBatchUpdates(batchChan <-chan []string) error {
+	for batch := range batchChan {
+		if err := fr.updateFile(batch); err != nil {
+			return err // Возвращаем ошибку, чтобы она была обработана errgroup
+		}
+	}
+	return nil
+}
+
+// updateFile обновляет файл, установив поле IsDeleted в true для заданных коротких ключей.
+func (fr *ShortenerFile) updateFile(shortKeys []string) error {
+	fr.mu.Lock()
+	defer fr.mu.Unlock()
+
+	// Создание временного файла
+	tmpFilePath := fr.filePath + ".tmp"
+	tmpFile, err := os.Create(tmpFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer func() {
+		tmpFile.Close()
+		os.Remove(tmpFilePath)
+	}()
+
+	file, err := os.Open(fr.filePath)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(tmpFile)
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if containsKey(line, shortKeys) {
+			line = strings.ReplaceAll(line, `"is_deleted":false`, `"is_deleted":true`)
+		}
+		if _, err := writer.WriteString(line + "\n"); err != nil {
+			return fmt.Errorf("error writing to temp file: %w", err)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading file: %w", err)
+	}
+
+	if err := writer.Flush(); err != nil {
+		return fmt.Errorf("error flushing temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpFilePath, fr.filePath); err != nil {
+		return fmt.Errorf("failed to rename temp file: %w", err)
+	}
+
+	return nil
+}
+
+// containsKey проверяет, содержит ли строка любой из ключей.
+func containsKey(line string, shortKeys []string) bool {
+	for _, v := range shortKeys {
+		if strings.Contains(line, v) {
+			return true
+		}
+	}
+	return false
+}
+
 // findOrCreateURL ищет существующий URL в файле или создает новый, если не найден.
-func (fr ShortenerFile) findExistingURL(originalURL string) *entity.URL {
+func (fr *ShortenerFile) findExistingURL(originalURL string) *entity.URL {
 	if url, exists := fr.urls[originalURL]; exists {
 		return &url
 	}
@@ -156,7 +247,7 @@ func (fr ShortenerFile) findExistingURL(originalURL string) *entity.URL {
 }
 
 // saveURLToFile сохраняет новый URL в файл в формате JSON.
-func (fr ShortenerFile) saveURLToFile(url entity.URL) error {
+func (fr *ShortenerFile) saveURLToFile(url entity.URL) error {
 	if err := fr.makeDir(); err != nil {
 		return err
 	}
@@ -177,7 +268,7 @@ func (fr ShortenerFile) saveURLToFile(url entity.URL) error {
 }
 
 // readAll читает все URL из файла и загружает их в память.
-func (fr ShortenerFile) readAll() error {
+func (fr *ShortenerFile) readAll() error {
 	if err := fr.makeDir(); err != nil {
 		return err
 	}
@@ -207,7 +298,7 @@ func (fr ShortenerFile) readAll() error {
 }
 
 // makeDir создает директорию для хранения файла, если она не существует.
-func (fr ShortenerFile) makeDir() error {
+func (fr *ShortenerFile) makeDir() error {
 	folder := path.Dir(fr.filePath)
 	if _, err := os.Stat(folder); os.IsNotExist(err) {
 		if err := os.MkdirAll(folder, 0755); err != nil {
@@ -219,14 +310,14 @@ func (fr ShortenerFile) makeDir() error {
 }
 
 // closeFile закрывает файл и логгирует ошибку, если она произошла.
-func (fr ShortenerFile) closeFile(f *os.File) {
+func (fr *ShortenerFile) closeFile(f *os.File) {
 	if err := f.Close(); err != nil {
 		slog.Error("Failed to close file", slog.String("filePath", fr.filePath), slog.String("error", err.Error()))
 	}
 }
 
 // CheckHealth проверяет состояние репозитория, проверяя наличие файла на диске.
-func (fr ShortenerFile) CheckHealth() error {
+func (fr *ShortenerFile) CheckHealth() error {
 	if _, err := os.Stat(fr.filePath); os.IsNotExist(err) {
 		return fmt.Errorf("file does not exist: %w", err)
 	}
