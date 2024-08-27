@@ -69,7 +69,7 @@ func AuthCheckMiddleware() func(http.Handler) http.Handler {
 			userID, err := validateAuthTokenFromRequest(r, jwtSecret)
 			if err != nil {
 				slog.Warn("Missing or invalid token")
-				http.Error(w, "", http.StatusUnauthorized)
+				http.Error(w, err.Error(), http.StatusUnauthorized)
 				return
 			}
 
