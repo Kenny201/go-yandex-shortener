@@ -52,7 +52,11 @@ func NewShortenerFile(baseURL, filePath string) (*ShortenerFile, error) {
 // Get возвращает URL по короткому ключу, если он существует в файле.
 func (fr *ShortenerFile) Get(shortKey string) (*entity.URL, error) {
 	for _, v := range fr.urls {
-		if v.ShortKey == shortKey {
+		if v.ShortKey == shortKey && v.DeletedFlag {
+			return nil, ErrURLDeleted // URL помечен как удаленный
+		}
+
+		if v.ShortKey == shortKey && !v.DeletedFlag {
 			slog.Info("URL retrieved successfully", slog.String("shortKey", shortKey))
 			return &v, nil
 		}

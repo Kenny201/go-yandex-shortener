@@ -29,6 +29,8 @@ var (
 	ErrURLAlreadyExist   = errors.New("duplicate key found")
 	ErrEmptyURL          = errors.New("empty URL list provided")
 	ErrUserListURL       = errors.New("no short URLs found for repository ID: %s")
+	ErrURLDeleted        = errors.New("URL is deleted")
+	ErrURLNotFound       = errors.New("URL not found")
 )
 
 type ShortenerDatabase struct {
@@ -50,13 +52,17 @@ func NewShortenerDatabase(baseURL string, db *pgxpool.Pool) ShortenerDatabase {
 // Get извлекает информацию о коротком URL из базы данных по короткому ключу.
 func (dr ShortenerDatabase) Get(shortKey string) (*entity.URL, error) {
 	url := &entity.URL{}
-	query := "SELECT id, short_key, original_url FROM shorteners WHERE short_key = $1"
+	query := "SELECT id, short_key, original_url, is_deleted FROM shorteners WHERE short_key = $1"
 
-	if err := dr.db.QueryRow(context.Background(), query, shortKey).Scan(&url.ID, &url.ShortKey, &url.OriginalURL); err != nil {
+	if err := dr.db.QueryRow(context.Background(), query, shortKey).Scan(&url.ID, &url.ShortKey, &url.OriginalURL, &url.DeletedFlag); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("URL %v not found", shortKey)
+			return nil, ErrURLNotFound
 		}
 		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+
+	if url.DeletedFlag {
+		return nil, ErrURLDeleted // URL помечен как удаленный
 	}
 
 	slog.Info("URL retrieved", slog.String("shortKey", shortKey), slog.String("originalURL", url.OriginalURL))

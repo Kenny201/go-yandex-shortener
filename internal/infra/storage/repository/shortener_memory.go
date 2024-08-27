@@ -27,7 +27,11 @@ func NewShortenerMemory(baseURL string) *ShortenerMemory {
 // Get возвращает URL-адрес по короткому ключу, если он существует.
 func (mr *ShortenerMemory) Get(shortKey string) (*entity.URL, error) {
 	for _, v := range mr.urls {
-		if v.ShortKey == shortKey {
+		if v.ShortKey == shortKey && v.DeletedFlag {
+			return nil, ErrURLDeleted // URL помечен как удаленный
+		}
+
+		if v.ShortKey == shortKey && !v.DeletedFlag {
 			slog.Info("URL retrieved successfully", slog.String("shortKey", shortKey))
 			return &v, nil
 		}
@@ -95,7 +99,7 @@ func (mr *ShortenerMemory) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // MarkAsDeleted устанавливает поле IsDeleted в true для списка URL по коротким ключам.
-func (mr *ShortenerMemory) MarkAsDeleted(userID string, shortKeys []string) error {
+func (mr *ShortenerMemory) MarkAsDeleted(shortKeys []string, userID string) error {
 	if len(shortKeys) == 0 {
 		return fmt.Errorf("empty shortKey list provided")
 	}

@@ -3,13 +3,13 @@ package middleware
 import (
 	"context"
 	"errors"
-	"github.com/google/uuid"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/spf13/viper"
 )
 

@@ -154,14 +154,20 @@ func (h Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 	// Объявляем переменную для хранения данных в виде слайса строк
-	var lines []string
+	var shortKeys []string
 
 	// Парсим JSON в слайс строк
-	if err := json.Unmarshal(body, &lines); err != nil {
+	if err := json.Unmarshal(body, &shortKeys); err != nil {
 		http.Error(w, "Failed to parse JSON", http.StatusBadRequest)
 		return
 	}
-	err = h.shortenerService.Delete(lines, userID)
+
+	// Запуск асинхронного процесса удаления
+	err = h.shortenerService.Delete(shortKeys, userID)
+
+	if err != nil {
+		slog.Error("Failed to delete URLs", slog.String("userID", userID), slog.String("error", err.Error()))
+	}
 
 	slog.Info("Successfully deleted URLs for user", slog.String("userID", userID))
 	respondWithJSON(w, http.StatusAccepted, nil)

@@ -44,6 +44,14 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 	url, err := h.shortenerService.GetShortURL(id)
 
 	if err != nil {
+		if errors.Is(err, repository.ErrURLNotFound) {
+			http.Error(w, "URL not found", http.StatusNotFound)
+			return
+		} else if errors.Is(err, repository.ErrURLDeleted) {
+			http.Error(w, "URL is deleted", http.StatusGone)
+			return
+		}
+
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
