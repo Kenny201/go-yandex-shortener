@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage/repository"
 	"log/slog"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage/repository"
 )
 
 // ShortenerRepository определяет интерфейс для работы с хранилищем сокращённых ссылок.

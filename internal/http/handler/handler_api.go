@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage/repository"
 	"io"
 	"log/slog"
 	"net/http"
+
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage/repository"
 )
 
 // ErrorResponse представляет формат ответа об ошибке.

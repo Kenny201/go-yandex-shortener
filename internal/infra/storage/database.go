@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"log/slog"
 	"sync"
 	"time"
+
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage/repository"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/utils/closer"
-	"github.com/golang-migrate/migrate/v4"
-	"log/slog"
 )
 
 var (
