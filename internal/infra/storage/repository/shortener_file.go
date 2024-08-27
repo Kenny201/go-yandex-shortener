@@ -133,7 +133,7 @@ func (fr *ShortenerFile) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // MarkAsDeleted обновляет поле IsDeleted в true для списка URL по коротким ключам.
-func (fr *ShortenerFile) MarkAsDeleted(shortKeys []string, userId string) error {
+func (fr *ShortenerFile) MarkAsDeleted(shortKeys []string, userID string) error {
 	if len(shortKeys) == 0 {
 		return fmt.Errorf("empty URL list provided")
 	}
@@ -148,7 +148,7 @@ func (fr *ShortenerFile) MarkAsDeleted(shortKeys []string, userId string) error 
 	// Запуск воркеров с использованием errgroup
 	for i := 0; i < numBatches; i++ {
 		eg.Go(func() error {
-			return fr.processBatchUpdates(userId, batchChan)
+			return fr.processBatchUpdates(userID, batchChan)
 		})
 	}
 

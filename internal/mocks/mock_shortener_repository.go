@@ -109,15 +109,15 @@ func (mr *MockShortenerRepositoryMockRecorder) GetAll(userID interface{}) *gomoc
 }
 
 // MarkAsDeleted mocks base method.
-func (m *MockShortenerRepository) MarkAsDeleted(shortKeys []string, userId string) error {
+func (m *MockShortenerRepository) MarkAsDeleted(shortKeys []string, userID string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MarkAsDeleted", shortKeys, userId)
+	ret := m.ctrl.Call(m, "MarkAsDeleted", shortKeys, userID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // MarkAsDeleted indicates an expected call of MarkAsDeleted.
-func (mr *MockShortenerRepositoryMockRecorder) MarkAsDeleted(shortKeys, userId interface{}) *gomock.Call {
+func (mr *MockShortenerRepositoryMockRecorder) MarkAsDeleted(shortKeys, userID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkAsDeleted", reflect.TypeOf((*MockShortenerRepository)(nil).MarkAsDeleted), shortKeys, userId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkAsDeleted", reflect.TypeOf((*MockShortenerRepository)(nil).MarkAsDeleted), shortKeys, userID)
 }

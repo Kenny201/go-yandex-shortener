@@ -23,7 +23,7 @@ type ShortenerRepository interface {
 	CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error)
 	// GetAll получает все сокращённые ссылки пользователя
 	GetAll(userID string) ([]*entity.URLItem, error)
-	MarkAsDeleted(shortKeys []string, userId string) error
+	MarkAsDeleted(shortKeys []string, userID string) error
 	// CheckHealth проверяет состояние хранилища (доступность, целостность и т.д.).
 	CheckHealth() error
 }
@@ -118,8 +118,8 @@ func (s *Shortener) GetAllShortURL(userID string) ([]*entity.URLItem, error) {
 	return s.repo.GetAll(userID)
 }
 
-func (s *Shortener) Delete(shortKeys []string, userId string) error {
-	return s.repo.MarkAsDeleted(shortKeys, userId)
+func (s *Shortener) Delete(shortKeys []string, userID string) error {
+	return s.repo.MarkAsDeleted(shortKeys, userID)
 }
 
 // CheckHealth проверяет состояние репозитория, с которым работает сервис.
