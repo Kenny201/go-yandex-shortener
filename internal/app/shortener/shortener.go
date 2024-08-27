@@ -23,6 +23,7 @@ type ShortenerRepository interface {
 	CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error)
 	// GetAll получает все сокращённые ссылки пользователя
 	GetAll(userID string) ([]*entity.URLItem, error)
+	// MarkAsDeleted помечает определённые ссылки как удалённые
 	MarkAsDeleted(shortKeys []string, userID string) error
 	// CheckHealth проверяет состояние хранилища (доступность, целостность и т.д.).
 	CheckHealth() error
