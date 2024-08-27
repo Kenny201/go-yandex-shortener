@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
-	"golang.org/x/sync/errgroup"
 	"io"
 	"log/slog"
 	"os"
@@ -15,6 +12,11 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+
+	"golang.org/x/sync/errgroup"
+
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
 )
 
 var (
@@ -100,7 +102,6 @@ func (fr *ShortenerFile) CreateList(userID interface{}, urls []*entity.URLItem) 
 		if err := fr.saveURLToFile(urlEntity); err != nil {
 			return nil, err
 		}
-
 		shortUrls = append(shortUrls, &entity.URLItem{ID: urlEntity.ID, ShortURL: fmt.Sprintf("%s/%s", fr.baseURL, urlEntity.ShortKey)})
 		fr.urls[urlItem.OriginalURL] = urlEntity
 	}
@@ -128,7 +129,7 @@ func (fr *ShortenerFile) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // MarkAsDeleted обновляет поле IsDeleted в true для списка URL по коротким ключам.
-func (fr *ShortenerFile) MarkAsDeleted(shortKeys []string) error {
+func (fr *ShortenerFile) MarkAsDeleted(shortKeys []string, userId string) error {
 	if len(shortKeys) == 0 {
 		return fmt.Errorf("empty URL list provided")
 	}
@@ -143,7 +144,7 @@ func (fr *ShortenerFile) MarkAsDeleted(shortKeys []string) error {
 	// Запуск воркеров с использованием errgroup
 	for i := 0; i < numBatches; i++ {
 		eg.Go(func() error {
-			return fr.processBatchUpdates(batchChan)
+			return fr.processBatchUpdates(userId, batchChan)
 		})
 	}
 
@@ -168,9 +169,9 @@ func (fr *ShortenerFile) MarkAsDeleted(shortKeys []string) error {
 }
 
 // processBatchUpdates обрабатывает обновления URL в батчах.
-func (fr *ShortenerFile) processBatchUpdates(batchChan <-chan []string) error {
+func (fr *ShortenerFile) processBatchUpdates(userID string, batchChan <-chan []string) error {
 	for batch := range batchChan {
-		if err := fr.updateFile(batch); err != nil {
+		if err := fr.updateFile(userID, batch); err != nil {
 			return err // Возвращаем ошибку, чтобы она была обработана errgroup
 		}
 	}
@@ -178,7 +179,7 @@ func (fr *ShortenerFile) processBatchUpdates(batchChan <-chan []string) error {
 }
 
 // updateFile обновляет файл, установив поле IsDeleted в true для заданных коротких ключей.
-func (fr *ShortenerFile) updateFile(shortKeys []string) error {
+func (fr *ShortenerFile) updateFile(userID string, shortKeys []string) error {
 	fr.mu.Lock()
 	defer fr.mu.Unlock()
 
@@ -204,7 +205,7 @@ func (fr *ShortenerFile) updateFile(shortKeys []string) error {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		if containsKey(line, shortKeys) {
+		if containsKey(line, shortKeys) && containsUserID(line, userID) {
 			line = strings.ReplaceAll(line, `"is_deleted":false`, `"is_deleted":true`)
 		}
 		if _, err := writer.WriteString(line + "\n"); err != nil {
@@ -235,6 +236,11 @@ func containsKey(line string, shortKeys []string) bool {
 		}
 	}
 	return false
+}
+
+// containsUserID проверяет, принадлежит ли строка указанному userID.
+func containsUserID(line, userID string) bool {
+	return strings.Contains(line, fmt.Sprintf(`"user_id":"%s"`, userID))
 }
 
 // findOrCreateURL ищет существующий URL в файле или создает новый, если не найден.

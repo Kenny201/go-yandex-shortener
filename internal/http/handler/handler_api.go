@@ -161,7 +161,7 @@ func (h Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to parse JSON", http.StatusBadRequest)
 		return
 	}
-	err = h.shortenerService.Delete(lines)
+	err = h.shortenerService.Delete(lines, userID)
 
 	slog.Info("Successfully deleted URLs for user", slog.String("userID", userID))
 	respondWithJSON(w, http.StatusAccepted, nil)

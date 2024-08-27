@@ -4,14 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"log/slog"
+	"runtime"
+
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
-	"log/slog"
-	"runtime"
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -21,14 +23,12 @@ import (
 )
 
 var (
-	ErrOpenDatabaseFailed  = errors.New("unable to connect to database")
-	ErrCloseDatabaseFailed = errors.New("unable to close database connection")
-	ErrOpenMigrateFailed   = errors.New("unable to open migrate files")
-	ErrCopyFrom            = errors.New("error during copy operation")
-	ErrCopyCount           = errors.New("discrepancy in copied data count")
-	ErrURLAlreadyExist     = errors.New("duplicate key found")
-	ErrEmptyURL            = errors.New("empty URL list provided")
-	ErrUserListURL         = errors.New("no short URLs found for repository ID: %s")
+	ErrOpenMigrateFailed = errors.New("unable to open migrate files")
+	ErrCopyFrom          = errors.New("error during copy operation")
+	ErrCopyCount         = errors.New("discrepancy in copied data count")
+	ErrURLAlreadyExist   = errors.New("duplicate key found")
+	ErrEmptyURL          = errors.New("empty URL list provided")
+	ErrUserListURL       = errors.New("no short URLs found for repository ID: %s")
 )
 
 type ShortenerDatabase struct {
@@ -175,7 +175,7 @@ func (dr ShortenerDatabase) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // MarkAsDeleted обновляет поле is_deleted на true для списка коротких URL.
-func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string) error {
+func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string, userId string) error {
 	if len(shortKeys) == 0 {
 		return fmt.Errorf("empty URL list provided")
 	}
@@ -198,7 +198,7 @@ func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string) error {
 		workerID := i // Локальная переменная, чтобы избежать захвата
 		eg.Go(func() error {
 			slog.Info("Worker started", slog.Int("workerID", workerID))
-			err := dr.processBatchUpdates(batchChan, doneChan, workerID)
+			err := dr.processBatchUpdates(userId, batchChan, doneChan, workerID)
 			slog.Info("Worker finished", slog.Int("workerID", workerID))
 			return err
 		})
@@ -233,7 +233,7 @@ func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string) error {
 }
 
 // processBatchUpdates обрабатывает обновления URL в батчах.
-func (dr ShortenerDatabase) processBatchUpdates(batchChan <-chan []string, doneChan <-chan struct{}, workerID int) error {
+func (dr ShortenerDatabase) processBatchUpdates(userID string, batchChan <-chan []string, doneChan <-chan struct{}, workerID int) error {
 	for {
 		select {
 		case batch, ok := <-batchChan:
@@ -246,8 +246,8 @@ func (dr ShortenerDatabase) processBatchUpdates(batchChan <-chan []string, doneC
 
 			for _, key := range batch {
 				slog.Debug("Worker queueing URL", slog.Int("workerID", workerID), slog.String("shortKey", key))
-				query := "UPDATE shorteners SET is_deleted = true WHERE short_key = $1"
-				batchObj.Queue(query, key)
+				query := "UPDATE shorteners SET is_deleted = true WHERE short_key = $1 AND user_id = $2"
+				batchObj.Queue(query, key, userID)
 			}
 
 			if err := dr.executeBatch(batchObj); err != nil {

@@ -16,9 +16,8 @@ import (
 )
 
 var (
-	ErrOpenDatabaseFailed  = errors.New("unable to open database connection")
-	ErrCloseDatabaseFailed = errors.New("unable to close database connection")
-	Err                    = errors.New("error")
+	ErrOpenDatabaseFailed = errors.New("unable to open database connection")
+	Err                   = errors.New("error")
 )
 
 // singletonDBPool - пул подключений к базе данных.

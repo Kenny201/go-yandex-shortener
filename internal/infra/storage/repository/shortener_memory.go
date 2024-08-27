@@ -3,6 +3,8 @@ package repository
 import (
 	"fmt"
 	"log/slog"
+	"runtime"
+	"sync"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
@@ -11,18 +13,19 @@ import (
 type ShortenerMemory struct {
 	baseURL string
 	urls    map[string]entity.URL
+	mu      sync.Mutex
 }
 
 // NewShortenerMemory создает новый репозиторий сокращения ссылок в памяти.
-func NewShortenerMemory(baseURL string) ShortenerMemory {
-	return ShortenerMemory{
+func NewShortenerMemory(baseURL string) *ShortenerMemory {
+	return &ShortenerMemory{
 		baseURL: baseURL,
 		urls:    make(map[string]entity.URL),
 	}
 }
 
 // Get возвращает URL-адрес по короткому ключу, если он существует.
-func (mr ShortenerMemory) Get(shortKey string) (*entity.URL, error) {
+func (mr *ShortenerMemory) Get(shortKey string) (*entity.URL, error) {
 	for _, v := range mr.urls {
 		if v.ShortKey == shortKey {
 			slog.Info("URL retrieved successfully", slog.String("shortKey", shortKey))
@@ -33,7 +36,7 @@ func (mr ShortenerMemory) Get(shortKey string) (*entity.URL, error) {
 }
 
 // Create добавляет новый URL в репозиторий, если его еще нет.
-func (mr ShortenerMemory) Create(url *entity.URL) (*entity.URL, error) {
+func (mr *ShortenerMemory) Create(url *entity.URL) (*entity.URL, error) {
 	if v, exists := mr.urls[url.OriginalURL]; exists {
 		return &v, ErrURLAlreadyExist
 	}
@@ -43,7 +46,7 @@ func (mr ShortenerMemory) Create(url *entity.URL) (*entity.URL, error) {
 }
 
 // CreateList добавляет список новых URL в репозиторий, возвращая их сокращенные версии.
-func (mr ShortenerMemory) CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error) {
+func (mr *ShortenerMemory) CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error) {
 	shortUrls := make([]*entity.URLItem, 0, len(urls))
 	baseURL, err := valueobject.NewBaseURL(mr.baseURL)
 
@@ -74,7 +77,7 @@ func (mr ShortenerMemory) CreateList(userID interface{}, urls []*entity.URLItem)
 }
 
 // GetAll получает все ссылки определённого пользователя
-func (mr ShortenerMemory) GetAll(userID string) ([]*entity.URLItem, error) {
+func (mr *ShortenerMemory) GetAll(userID string) ([]*entity.URLItem, error) {
 	shortUrls := make([]*entity.URLItem, 0, len(mr.urls))
 
 	for _, urlItem := range mr.urls {
@@ -92,27 +95,63 @@ func (mr ShortenerMemory) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // MarkAsDeleted устанавливает поле IsDeleted в true для списка URL по коротким ключам.
-func (mr ShortenerMemory) MarkAsDeleted(shortKeys []string) error {
+func (mr *ShortenerMemory) MarkAsDeleted(userID string, shortKeys []string) error {
 	if len(shortKeys) == 0 {
 		return fmt.Errorf("empty shortKey list provided")
 	}
 
+	const batchSize = 10           // Размер батча для обновлений
+	numBatches := runtime.NumCPU() // Количество воркеров
+
+	// Создание группы ошибок и канала для передачи батчей URL
+	batchChan := make(chan []string, numBatches)
+
+	// Запуск воркеров с использованием errgroup
+	for i := 0; i < numBatches; i++ {
+		go mr.processBatchUpdates(userID, batchChan)
+	}
+
+	// Наполнение batchChan и закрытие канала
+	go func() {
+		for i := 0; i < len(shortKeys); i += batchSize {
+			end := i + batchSize
+			if end > len(shortKeys) {
+				end = len(shortKeys)
+			}
+			batchChan <- shortKeys[i:end]
+		}
+		close(batchChan)
+	}()
+
+	return nil
+}
+
+// processBatchUpdates обрабатывает обновления URL в батчах.
+func (mr *ShortenerMemory) processBatchUpdates(userID string, batchChan <-chan []string) {
+	for batch := range batchChan {
+		mr.updateUrls(userID, batch)
+	}
+}
+
+// updateUrls обновление urls
+func (mr *ShortenerMemory) updateUrls(userID string, shortKeys []string) {
+	mr.mu.Lock()
+	defer mr.mu.Unlock()
+
 	// Обновление записей по ключам.
 	for _, shortKey := range shortKeys {
 		for originalURL, url := range mr.urls {
-			if url.ShortKey == shortKey && !url.DeletedFlag {
+			if url.ShortKey == shortKey && !url.DeletedFlag && url.UserID == userID {
 				url.DeletedFlag = true
 				mr.urls[originalURL] = url
 				break
 			}
 		}
 	}
-
-	return nil
 }
 
 // CheckHealth проверяет состояние репозитория, возвращая ошибку, если он не инициализирован.
-func (mr ShortenerMemory) CheckHealth() error {
+func (mr *ShortenerMemory) CheckHealth() error {
 	if mr.urls == nil {
 		return fmt.Errorf("memory URLs structure is not initialized")
 	}
