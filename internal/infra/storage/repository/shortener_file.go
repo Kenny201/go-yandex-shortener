@@ -30,7 +30,7 @@ type ShortenerFile struct {
 	baseURL  string
 	filePath string
 	urls     map[string]entity.URL
-	mu       sync.RWMutex
+	mu       sync.Mutex
 }
 
 // NewShortenerFile создает новый репозиторий сокращения ссылок с сохранением данных в файл.

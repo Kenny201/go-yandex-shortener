@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
-	"log/slog"
 	"runtime"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -14,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/errgroup"
+	"log/slog"
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -181,7 +180,7 @@ func (dr ShortenerDatabase) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // MarkAsDeleted обновляет поле is_deleted на true для списка коротких URL.
-func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string, userId string) error {
+func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string, userID string) error {
 	if len(shortKeys) == 0 {
 		return fmt.Errorf("empty URL list provided")
 	}
@@ -189,29 +188,29 @@ func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string, userId string) err
 	const batchSize = 10           // Размер батча для обновлений
 	numBatches := runtime.NumCPU() // Количество воркеров
 
-	// Создание группы ошибок
+	// Создание группы ошибок и каналов
 	eg := new(errgroup.Group)
-
-	// Канал для передачи батчей URL
 	batchChan := make(chan []string, numBatches)
-
-	// Канал для сигнализации о завершении работы
 	doneChan := make(chan struct{})
-	defer close(doneChan) // Гарантированное закрытие канала при выходе
+	defer close(doneChan)
 
 	// Запуск воркеров с использованием errgroup
 	for i := 0; i < numBatches; i++ {
-		workerID := i // Локальная переменная, чтобы избежать захвата
+		workerID := i // Локальная переменная для избежания захвата
 		eg.Go(func() error {
 			slog.Info("Worker started", slog.Int("workerID", workerID))
-			err := dr.processBatchUpdates(userId, batchChan, doneChan, workerID)
+			err := dr.processBatchUpdates(userID, batchChan, doneChan, workerID)
+			if err != nil {
+				slog.Error("Worker error", slog.Int("workerID", workerID), slog.String("error", err.Error()))
+			}
 			slog.Info("Worker finished", slog.Int("workerID", workerID))
 			return err
 		})
 	}
 
-	// Запуск горутины для наполнения batchChan (Fan-In)
+	// Запуск горутины для наполнения batchChan (Fan-Out)
 	go func() {
+		defer close(batchChan)
 		for i := 0; i < len(shortKeys); i += batchSize {
 			end := i + batchSize
 			if end > len(shortKeys) {
@@ -225,13 +224,12 @@ func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string, userId string) err
 				return
 			}
 		}
-		close(batchChan)
 	}()
 
-	// Ожидание завершения всех воркеров и обработки ошибок
+	// Ожидание завершения всех воркеров и обработка ошибок
 	if err := eg.Wait(); err != nil {
 		slog.Error("Error occurred during batch processing", slog.String("error", err.Error()))
-		return fmt.Errorf("one or more errors occurred: %v", err)
+		return fmt.Errorf("one or more errors occurred: %w", err)
 	}
 
 	slog.Info("All batches processed successfully")
@@ -244,6 +242,7 @@ func (dr ShortenerDatabase) processBatchUpdates(userID string, batchChan <-chan 
 		select {
 		case batch, ok := <-batchChan:
 			if !ok {
+				slog.Info("Worker received all batches and exiting", slog.Int("workerID", workerID))
 				return nil // Канал закрыт, обработка завершена
 			}
 
@@ -257,6 +256,7 @@ func (dr ShortenerDatabase) processBatchUpdates(userID string, batchChan <-chan 
 			}
 
 			if err := dr.executeBatch(batchObj); err != nil {
+				slog.Error("Failed to execute batch", slog.Int("workerID", workerID), slog.String("error", err.Error()))
 				return err // Возвращаем ошибку, чтобы она была обработана errgroup
 			}
 
@@ -276,10 +276,11 @@ func (dr ShortenerDatabase) executeBatch(batch *pgx.Batch) error {
 	for i := 0; i < batch.Len(); i++ {
 		tag, err := br.Exec()
 		if err != nil {
+			slog.Error("Failed to execute batch query", slog.String("error", err.Error()))
 			return fmt.Errorf("failed to update URL: %w", err)
 		}
 		if tag.RowsAffected() == 0 {
-			return fmt.Errorf("no rows affected for URL")
+			slog.Warn("No rows affected for URL", slog.Int("batchIndex", i))
 		}
 	}
 	return nil
