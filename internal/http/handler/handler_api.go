@@ -97,7 +97,6 @@ func (h Handler) PostBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
-	// Получаем userID из контекста
 	userID, ok := r.Context().Value(middleware.UserIDContextKey).(string)
 	if !ok || userID == "" {
 		slog.Warn("Unauthorized access attempt: userID not found or empty")
@@ -105,10 +104,8 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Логируем userID для дальнейшего анализа
 	slog.Info("Fetching URLs for user", slog.String("userID", userID))
 
-	// Получаем список URL пользователя
 	urls, err := h.shortenerService.GetAllShortURL(userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserListURL) {

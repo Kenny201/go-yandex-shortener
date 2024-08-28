@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -466,7 +467,7 @@ func TestDeleteHandler(t *testing.T) {
 			defer ctrl.Finish()
 
 			if tt.contextUserID != "" {
-				mockRepository.EXPECT().MarkAsDeleted([]string{tt.id}, tt.contextUserID).Return(tt.mockReturnError)
+				mockRepository.EXPECT().MarkAsDeleted([]string{tt.id}, tt.contextUserID, 10, runtime.NumCPU()).Return(tt.mockReturnError)
 			}
 
 			body := strings.NewReader(fmt.Sprintf(`[ "%s" ]`, tt.id))
