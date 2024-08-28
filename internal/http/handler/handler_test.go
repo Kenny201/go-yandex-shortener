@@ -16,7 +16,7 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage/repository"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/mocks"
 )
 
@@ -285,7 +285,7 @@ func TestPostBatchHandler(t *testing.T) {
 			mockReturnValue: []*entity.URLItem{
 				{ID: "1", ShortURL: "some-short-url-1"},
 			},
-			mockReturnError:         repository.ErrURLAlreadyExist,
+			mockReturnError:         storage.ErrURLAlreadyExist,
 			wantStatusCode:          http.StatusConflict,
 			wantResponseContentType: "application/json",
 			expectCreateListCalled:  true,

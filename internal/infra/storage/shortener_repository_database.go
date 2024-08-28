@@ -1,4 +1,4 @@
-package repository
+package storage
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime"
+	"sync"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/jackc/pgerrcode"
@@ -19,17 +21,21 @@ import (
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/utils/closer"
 )
 
 var (
-	ErrOpenMigrateFailed = errors.New("unable to open migrate files")
-	ErrCopyFrom          = errors.New("error during copy operation")
-	ErrCopyCount         = errors.New("discrepancy in copied data count")
-	ErrURLAlreadyExist   = errors.New("duplicate key found")
-	ErrEmptyURL          = errors.New("empty URL list provided")
-	ErrUserListURL       = errors.New("no short URLs found for repository ID: %s")
-	ErrURLDeleted        = errors.New("URL is deleted")
-	ErrURLNotFound       = errors.New("URL not found")
+	ErrParseConfigPGXPool = errors.New("error parse config for pgxpool")
+	ErrOpenDatabaseFailed = errors.New("unable to open database connection")
+	ErrOpenMigrateFailed  = errors.New("unable to open migrate files")
+	ErrCopyFrom           = errors.New("error during copy operation")
+	ErrCopyCount          = errors.New("discrepancy in copied data count")
+	ErrURLAlreadyExist    = errors.New("duplicate key found")
+	ErrEmptyURL           = errors.New("empty URL list provided")
+	ErrUserListURL        = errors.New("no short URLs found for repository ID: %s")
+	ErrURLDeleted         = errors.New("URL is deleted")
+	ErrURLNotFound        = errors.New("URL not found")
+	mu                    sync.Mutex
 )
 
 type ShortenerDatabase struct {
@@ -39,17 +45,48 @@ type ShortenerDatabase struct {
 }
 
 // NewShortenerDatabase создает новый экземпляр ShortenerDatabase и устанавливает подключение к базе данных.
-func NewShortenerDatabase(baseURL string, db *pgxpool.Pool) ShortenerDatabase {
-	repo := ShortenerDatabase{
-		db:      db,
+func NewShortenerDatabase(baseURL string, databaseDNS string) (*ShortenerDatabase, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Проверяем, существует ли уже подключение
+	config, err := pgxpool.ParseConfig(databaseDNS)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrParseConfigPGXPool, err)
+	}
+
+	// Настройка параметров пула
+	config.MaxConns = 100                    // Максимальное количество соединений
+	config.MinConns = 10                     // Минимальное количество соединений
+	config.MaxConnIdleTime = 5 * time.Minute // Время ожидания неактивного соединения
+	config.MaxConnLifetime = 1 * time.Hour   // Время жизни соединения
+
+	dbPool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrOpenDatabaseFailed, err)
+	}
+
+	repo := &ShortenerDatabase{
+		db:      dbPool,
 		baseURL: baseURL,
 	}
 
-	return repo
+	// Добавляем закрытие соединения в closer
+	closer.CL.Add(repo.Close)
+
+	return repo, nil
+}
+
+// Close закрывает соединение с базой данных.
+func (dr *ShortenerDatabase) Close(ctx context.Context) error {
+	// Закрытие пула подключений, ошибки не возвращаются
+	dr.db.Close()
+	slog.Info("Database connection gracefully closed")
+	return nil
 }
 
 // Get извлекает информацию о коротком URL из базы данных по короткому ключу.
-func (dr ShortenerDatabase) Get(shortKey string) (*entity.URL, error) {
+func (dr *ShortenerDatabase) Get(shortKey string) (*entity.URL, error) {
 	url := &entity.URL{}
 	query := "SELECT id, short_key, original_url, is_deleted FROM shorteners WHERE short_key = $1"
 
@@ -69,7 +106,7 @@ func (dr ShortenerDatabase) Get(shortKey string) (*entity.URL, error) {
 }
 
 // Create добавляет новый URL в базу данных.
-func (dr ShortenerDatabase) Create(url *entity.URL) (*entity.URL, error) {
+func (dr *ShortenerDatabase) Create(url *entity.URL) (*entity.URL, error) {
 	query := "INSERT INTO shorteners (id, user_id, short_key, original_url) VALUES ($1,$2,$3,$4)"
 	_, err := dr.db.Exec(context.Background(), query, url.ID, url.UserID, url.ShortKey, url.OriginalURL)
 	if err != nil {
@@ -82,7 +119,7 @@ func (dr ShortenerDatabase) Create(url *entity.URL) (*entity.URL, error) {
 }
 
 // handleDuplicateURL обрабатывает ситуацию с дублирующимся URL.
-func (dr ShortenerDatabase) handleDuplicateURL(originalURL string) (*entity.URL, error) {
+func (dr *ShortenerDatabase) handleDuplicateURL(originalURL string) (*entity.URL, error) {
 	existingURL, err := dr.findExistingURL(originalURL)
 	if err != nil {
 		return nil, err
@@ -91,7 +128,7 @@ func (dr ShortenerDatabase) handleDuplicateURL(originalURL string) (*entity.URL,
 }
 
 // findExistingURL ищет уже существующий URL в базе данных по оригинальному URL.
-func (dr ShortenerDatabase) findExistingURL(originalURL string) (*entity.URL, error) {
+func (dr *ShortenerDatabase) findExistingURL(originalURL string) (*entity.URL, error) {
 	var existingURL entity.URL
 	query := "SELECT id, short_key, original_url FROM shorteners WHERE original_url = $1"
 
@@ -102,7 +139,7 @@ func (dr ShortenerDatabase) findExistingURL(originalURL string) (*entity.URL, er
 }
 
 // CreateList добавляет список новых URL в базу данных и возвращает их сокращенные версии.
-func (dr ShortenerDatabase) CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error) {
+func (dr *ShortenerDatabase) CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error) {
 	if len(urls) == 0 {
 		return nil, ErrEmptyURL
 	}
@@ -144,7 +181,7 @@ func (dr ShortenerDatabase) CreateList(userID interface{}, urls []*entity.URLIte
 }
 
 // GetAll получает все ссылки определённого пользователя
-func (dr ShortenerDatabase) GetAll(userID string) ([]*entity.URLItem, error) {
+func (dr *ShortenerDatabase) GetAll(userID string) ([]*entity.URLItem, error) {
 	var shortURLs []*entity.URLItem
 
 	query := `
@@ -180,7 +217,7 @@ func (dr ShortenerDatabase) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // MarkAsDeleted обновляет поле is_deleted на true для списка коротких URL.
-func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string, userID string) error {
+func (dr *ShortenerDatabase) MarkAsDeleted(shortKeys []string, userID string) error {
 	if len(shortKeys) == 0 {
 		return fmt.Errorf("empty URL list provided")
 	}
@@ -237,7 +274,7 @@ func (dr ShortenerDatabase) MarkAsDeleted(shortKeys []string, userID string) err
 }
 
 // processBatchUpdates обрабатывает обновления URL в батчах.
-func (dr ShortenerDatabase) processBatchUpdates(userID string, batchChan <-chan []string, doneChan <-chan struct{}, workerID int) error {
+func (dr *ShortenerDatabase) processBatchUpdates(userID string, batchChan <-chan []string, doneChan <-chan struct{}, workerID int) error {
 	for {
 		select {
 		case batch, ok := <-batchChan:
@@ -269,7 +306,7 @@ func (dr ShortenerDatabase) processBatchUpdates(userID string, batchChan <-chan 
 }
 
 // executeBatch выполняет пакетный запрос и передает ошибки в errorsChan.
-func (dr ShortenerDatabase) executeBatch(batch *pgx.Batch) error {
+func (dr *ShortenerDatabase) executeBatch(batch *pgx.Batch) error {
 	br := dr.db.SendBatch(context.Background(), batch)
 	defer br.Close()
 
@@ -287,7 +324,7 @@ func (dr ShortenerDatabase) executeBatch(batch *pgx.Batch) error {
 }
 
 // copyURLsToDB копирует данные URL в базу данных с использованием CopyFrom.
-func (dr ShortenerDatabase) copyURLsToDB(urlBatch [][]interface{}) error {
+func (dr *ShortenerDatabase) copyURLsToDB(urlBatch [][]interface{}) error {
 	rowsCopied, err := dr.db.CopyFrom(
 		context.Background(),
 		pgx.Identifier{"shorteners"},
@@ -301,7 +338,7 @@ func (dr ShortenerDatabase) copyURLsToDB(urlBatch [][]interface{}) error {
 }
 
 // handleCopyError обрабатывает ошибки при копировании данных в базу данных.
-func (dr ShortenerDatabase) handleCopyError(err error, rowsCopied int64, expectedRows int) error {
+func (dr *ShortenerDatabase) handleCopyError(err error, rowsCopied int64, expectedRows int) error {
 	if pgErr := parsePGError(err); pgErr != nil {
 		return fmt.Errorf("%w for id: %v", ErrURLAlreadyExist, pgErr)
 	}
@@ -320,7 +357,7 @@ func parsePGError(err error) *pgconn.PgError {
 }
 
 // Migrate выполняет миграцию базы данных.
-func (dr ShortenerDatabase) Migrate() error {
+func (dr *ShortenerDatabase) Migrate() error {
 	m, err := migrate.New("file://internal/migrations", dr.databaseDNS)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrOpenMigrateFailed, err)
@@ -334,7 +371,7 @@ func (dr ShortenerDatabase) Migrate() error {
 }
 
 // CheckHealth проверяет состояние соединения с базой данных.
-func (dr ShortenerDatabase) CheckHealth() error {
+func (dr *ShortenerDatabase) CheckHealth() error {
 	if err := dr.db.Ping(context.Background()); err != nil {
 		return fmt.Errorf("unable to ping database: %w", err)
 	}

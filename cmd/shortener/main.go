@@ -37,17 +37,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	shortenerService := shortener.New(repository.GetShortenerRepository(), args.BaseURL)
+	shortenerService := shortener.New(repository, args.BaseURL)
 
 	urlHandler := handler.New(shortenerService)
 
 	http.NewServer(ctx, args.ServerAddress, urlHandler).Start()
 }
 
-func initializeRepository(args *config.Args) (storage.Repository, error) {
+func initializeRepository(args *config.Args) (shortener.Repository, error) {
 	switch {
 	case args.DatabaseDNS != "":
-		repo, err := storage.NewDatabaseRepositories(args.BaseURL, args.DatabaseDNS)
+		repo, err := storage.NewShortenerDatabase(args.BaseURL, args.DatabaseDNS)
 		if err != nil {
 			return nil, err
 		}
@@ -57,9 +57,9 @@ func initializeRepository(args *config.Args) (storage.Repository, error) {
 		return repo, nil
 
 	case args.FileStoragePath != "":
-		return storage.NewFileRepositories(args.BaseURL, args.FileStoragePath)
+		return storage.NewShortenerFile(args.BaseURL, args.FileStoragePath)
 
 	default:
-		return storage.NewMemoryRepositories(args.BaseURL), nil
+		return storage.NewShortenerMemory(args.BaseURL), nil
 	}
 }
