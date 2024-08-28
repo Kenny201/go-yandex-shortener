@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"runtime"
 	"sync"
 	"time"
 
@@ -218,14 +217,7 @@ func (dr *ShortenerDatabase) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // MarkAsDeleted обновляет поле is_deleted на true для списка коротких URL.
-func (dr *ShortenerDatabase) MarkAsDeleted(shortKeys []string, userID string) error {
-	if len(shortKeys) == 0 {
-		return fmt.Errorf("empty URL list provided")
-	}
-
-	const batchSize = 10           // Размер батча для обновлений
-	numBatches := runtime.NumCPU() // Количество воркеров
-
+func (dr *ShortenerDatabase) MarkAsDeleted(shortKeys []string, userID string, batchSize int, numBatches int) error {
 	eg := new(errgroup.Group)
 	batchChan := make(chan []string, numBatches)
 	doneChan := make(chan struct{})

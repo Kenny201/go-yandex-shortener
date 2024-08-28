@@ -3,7 +3,6 @@ package storage
 import (
 	"fmt"
 	"log/slog"
-	"runtime"
 	"sync"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
@@ -99,14 +98,7 @@ func (mr *ShortenerMemory) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // MarkAsDeleted устанавливает поле IsDeleted в true для списка URL по коротким ключам.
-func (mr *ShortenerMemory) MarkAsDeleted(shortKeys []string, userID string) error {
-	if len(shortKeys) == 0 {
-		return fmt.Errorf("empty shortKey list provided")
-	}
-
-	const batchSize = 10           // Размер батча для обновлений
-	numBatches := runtime.NumCPU() // Количество воркеров
-
+func (mr *ShortenerMemory) MarkAsDeleted(shortKeys []string, userID string, batchSize int, numBatches int) error {
 	batchChan := make(chan []string, numBatches)
 
 	for i := 0; i < numBatches; i++ {

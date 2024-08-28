@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
@@ -24,7 +25,7 @@ type Repository interface {
 	// GetAll получает все сокращённые ссылки пользователя
 	GetAll(userID string) ([]*entity.URLItem, error)
 	// MarkAsDeleted помечает определённые ссылки как удалённые
-	MarkAsDeleted(shortKeys []string, userID string) error
+	MarkAsDeleted(shortKeys []string, userID string, batchSize int, numBatches int) error
 	// CheckHealth проверяет состояние хранилища (доступность, целостность и т.д.).
 	CheckHealth() error
 }
@@ -120,7 +121,14 @@ func (s *Shortener) GetAllShortURL(userID string) ([]*entity.URLItem, error) {
 }
 
 func (s *Shortener) Delete(shortKeys []string, userID string) error {
-	return s.repo.MarkAsDeleted(shortKeys, userID)
+	if len(shortKeys) == 0 {
+		return fmt.Errorf("empty URL list provided")
+	}
+
+	const batchSize = 10           // Размер батча для обновлений
+	numBatches := runtime.NumCPU() // Количество воркеров
+
+	return s.repo.MarkAsDeleted(shortKeys, userID, batchSize, numBatches)
 }
 
 // CheckHealth проверяет состояние репозитория, с которым работает сервис.

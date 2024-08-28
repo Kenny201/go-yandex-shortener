@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"os"
 	"path"
-	"runtime"
 	"strings"
 	"sync"
 
@@ -133,14 +132,7 @@ func (fr *ShortenerFile) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // MarkAsDeleted обновляет поле IsDeleted в true для списка URL по коротким ключам.
-func (fr *ShortenerFile) MarkAsDeleted(shortKeys []string, userID string) error {
-	if len(shortKeys) == 0 {
-		return fmt.Errorf("empty URL list provided")
-	}
-
-	const batchSize = 10           // Размер батча для обновлений
-	numBatches := runtime.NumCPU() // Количество воркеров
-
+func (fr *ShortenerFile) MarkAsDeleted(shortKeys []string, userID string, batchSize int, numBatches int) error {
 	// Создание группы ошибок и канала для передачи батчей URL
 	eg := new(errgroup.Group)
 	batchChan := make(chan []string, numBatches)
