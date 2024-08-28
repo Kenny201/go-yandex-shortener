@@ -10,7 +10,7 @@ import (
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage/repository"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
 // ErrorResponse представляет формат ответа об ошибке.
@@ -58,7 +58,7 @@ func (h Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 	shortURL, err := h.shortenerService.CreateShortURL(r.Context(), request.URL)
 
 	if err != nil {
-		if errors.Is(err, repository.ErrURLAlreadyExist) {
+		if errors.Is(err, storage.ErrURLAlreadyExist) {
 			respondWithError(w, http.StatusConflict, BadRequest, shortURL)
 			return
 		}
@@ -92,7 +92,7 @@ func (h Handler) PostBatch(w http.ResponseWriter, r *http.Request) {
 	urls, err := h.shortenerService.CreateListShortURL(r.Context(), requestBatch)
 
 	if err != nil {
-		if errors.Is(err, repository.ErrURLAlreadyExist) {
+		if errors.Is(err, storage.ErrURLAlreadyExist) {
 			respondWithError(w, http.StatusConflict, BadRequest, urls)
 			return
 		}
@@ -118,7 +118,7 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 	// Получаем список URL пользователя
 	urls, err := h.shortenerService.GetAllShortURL(userID)
 	if err != nil {
-		if errors.Is(err, repository.ErrUserListURL) {
+		if errors.Is(err, storage.ErrUserListURL) {
 			slog.Info("No URLs found for user", slog.String("userID", userID))
 			respondWithError(w, http.StatusNoContent, "", "")
 			return

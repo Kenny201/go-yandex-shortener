@@ -4,17 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage/repository"
 	"log/slog"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
-// ShortenerRepository определяет интерфейс для работы с хранилищем сокращённых ссылок.
+// Repository определяет интерфейс для работы с хранилищем сокращённых ссылок.
 // Реализации этого интерфейса могут быть на базе различных хранилищ данных (память, файл, база данных и т.д.).
-type ShortenerRepository interface {
+type Repository interface {
 	// Get возвращает URL-объект по его идентификатору (короткому ключу).
 	Get(shortKey string) (*entity.URL, error)
 	// Create создает новый короткий URL и возвращает его.
@@ -30,12 +30,12 @@ type ShortenerRepository interface {
 // Shortener представляет собой основной сервис для работы с сокращёнными ссылками.
 // Он использует репозиторий для сохранения и получения данных.
 type Shortener struct {
-	repo    ShortenerRepository
+	repo    Repository
 	baseURL string
 }
 
 // New создает новый экземпляр сервиса Shortener с заданным репозиторием.
-func New(repository ShortenerRepository, baseURL string) *Shortener {
+func New(repository Repository, baseURL string) *Shortener {
 	return &Shortener{repo: repository, baseURL: baseURL}
 }
 
@@ -68,8 +68,8 @@ func (s *Shortener) CreateShortURL(ctx context.Context, originalURL string) (str
 	url, err := s.repo.Create(urlEntity)
 
 	if err != nil {
-		if errors.Is(err, repository.ErrURLAlreadyExist) {
-			return fmt.Sprintf("%s/%s", baseURL.ToString(), url.ShortKey), repository.ErrURLAlreadyExist
+		if errors.Is(err, storage.ErrURLAlreadyExist) {
+			return fmt.Sprintf("%s/%s", baseURL.ToString(), url.ShortKey), storage.ErrURLAlreadyExist
 		}
 
 		return "", err
@@ -84,7 +84,7 @@ func (s *Shortener) CreateShortURL(ctx context.Context, originalURL string) (str
 func (s *Shortener) CreateListShortURL(ctx context.Context, urls []*entity.URLItem) ([]*entity.URLItem, error) {
 
 	if len(urls) == 0 {
-		return nil, repository.ErrEmptyURL
+		return nil, storage.ErrEmptyURL
 	}
 
 	userID, ok := ctx.Value(middleware.UserIDContextKey).(string)
@@ -100,8 +100,8 @@ func (s *Shortener) CreateListShortURL(ctx context.Context, urls []*entity.URLIt
 	savedURLs, err := s.repo.CreateList(userIDValue, urls)
 
 	if err != nil {
-		if errors.Is(err, repository.ErrURLAlreadyExist) {
-			return savedURLs, repository.ErrURLAlreadyExist
+		if errors.Is(err, storage.ErrURLAlreadyExist) {
+			return savedURLs, storage.ErrURLAlreadyExist
 		}
 
 		return nil, err

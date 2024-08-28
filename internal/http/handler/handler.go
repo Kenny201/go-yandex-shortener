@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
-	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage/repository"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
 const (
@@ -71,7 +71,7 @@ func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
 	shortURL, err := h.shortenerService.CreateShortURL(r.Context(), string(body))
 
 	if err != nil {
-		if errors.Is(err, repository.ErrURLAlreadyExist) {
+		if errors.Is(err, storage.ErrURLAlreadyExist) {
 			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusConflict)
 			w.Write([]byte(shortURL))

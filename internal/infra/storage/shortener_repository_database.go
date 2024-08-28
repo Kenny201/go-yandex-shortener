@@ -1,10 +1,11 @@
-package repository
+package storage
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/jackc/pgerrcode"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/utils/closer"
 )
 
 var (
@@ -29,6 +31,11 @@ var (
 	ErrUserListURL         = errors.New("no short URLs found for repository ID: %s")
 )
 
+// Singleton для хранения единственного экземпляра подключения
+var (
+	mu sync.Mutex
+)
+
 // ShortenerDatabase предоставляет методы для работы с URL-ами в базе данных.
 type ShortenerDatabase struct {
 	db          *pgx.Conn
@@ -37,17 +44,42 @@ type ShortenerDatabase struct {
 }
 
 // NewShortenerDatabase создает новый экземпляр ShortenerDatabase и устанавливает подключение к базе данных.
-func NewShortenerDatabase(baseURL string, db *pgx.Conn) ShortenerDatabase {
-	repo := ShortenerDatabase{
-		db:      db,
-		baseURL: baseURL,
+func NewShortenerDatabase(baseURL string, databaseDNS string) (*ShortenerDatabase, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Проверяем, существует ли уже подключение
+	db, err := pgx.Connect(context.Background(), databaseDNS)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrOpenDatabaseFailed, err)
 	}
 
-	return repo
+	repo := &ShortenerDatabase{
+		db:          db,
+		databaseDNS: databaseDNS,
+		baseURL:     baseURL,
+	}
+
+	// Добавляем закрытие соединения в closer
+	closer.CL.Add(repo.Close)
+
+	return repo, nil
+}
+
+// Close Метод для закрытия соединения
+func (dr *ShortenerDatabase) Close(ctx context.Context) error {
+	if dr.db != nil {
+		if err := dr.db.Close(ctx); err != nil {
+			return fmt.Errorf("%w: %v", ErrCloseDatabaseFailed, err)
+		}
+		dr.db = nil
+	}
+	slog.Info("Database connection gracefully closed")
+	return nil
 }
 
 // Get извлекает информацию о коротком URL из базы данных по короткому ключу.
-func (dr ShortenerDatabase) Get(shortKey string) (*entity.URL, error) {
+func (dr *ShortenerDatabase) Get(shortKey string) (*entity.URL, error) {
 	url := &entity.URL{}
 	query := "SELECT id, short_key, original_url FROM shorteners WHERE short_key = $1"
 
@@ -63,7 +95,7 @@ func (dr ShortenerDatabase) Get(shortKey string) (*entity.URL, error) {
 }
 
 // Create добавляет новый URL в базу данных.
-func (dr ShortenerDatabase) Create(url *entity.URL) (*entity.URL, error) {
+func (dr *ShortenerDatabase) Create(url *entity.URL) (*entity.URL, error) {
 	query := "INSERT INTO shorteners (id, user_id, short_key, original_url) VALUES ($1,$2,$3,$4)"
 	_, err := dr.db.Exec(context.Background(), query, url.ID, url.UserID, url.ShortKey, url.OriginalURL)
 	if err != nil {
@@ -76,7 +108,7 @@ func (dr ShortenerDatabase) Create(url *entity.URL) (*entity.URL, error) {
 }
 
 // handleDuplicateURL обрабатывает ситуацию с дублирующимся URL.
-func (dr ShortenerDatabase) handleDuplicateURL(originalURL string) (*entity.URL, error) {
+func (dr *ShortenerDatabase) handleDuplicateURL(originalURL string) (*entity.URL, error) {
 	existingURL, err := dr.findExistingURL(originalURL)
 	if err != nil {
 		return nil, err
@@ -85,7 +117,7 @@ func (dr ShortenerDatabase) handleDuplicateURL(originalURL string) (*entity.URL,
 }
 
 // findExistingURL ищет уже существующий URL в базе данных по оригинальному URL.
-func (dr ShortenerDatabase) findExistingURL(originalURL string) (*entity.URL, error) {
+func (dr *ShortenerDatabase) findExistingURL(originalURL string) (*entity.URL, error) {
 	var existingURL entity.URL
 	query := "SELECT id, short_key, original_url FROM shorteners WHERE original_url = $1"
 
@@ -96,7 +128,7 @@ func (dr ShortenerDatabase) findExistingURL(originalURL string) (*entity.URL, er
 }
 
 // CreateList добавляет список новых URL в базу данных и возвращает их сокращенные версии.
-func (dr ShortenerDatabase) CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error) {
+func (dr *ShortenerDatabase) CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error) {
 	if len(urls) == 0 {
 		return nil, ErrEmptyURL
 	}
@@ -138,7 +170,7 @@ func (dr ShortenerDatabase) CreateList(userID interface{}, urls []*entity.URLIte
 }
 
 // GetAll получает все ссылки определённого пользователя
-func (dr ShortenerDatabase) GetAll(userID string) ([]*entity.URLItem, error) {
+func (dr *ShortenerDatabase) GetAll(userID string) ([]*entity.URLItem, error) {
 	var shortURLs []*entity.URLItem
 
 	query := `
@@ -174,7 +206,7 @@ func (dr ShortenerDatabase) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // copyURLsToDB копирует данные URL в базу данных с использованием CopyFrom.
-func (dr ShortenerDatabase) copyURLsToDB(urlBatch [][]interface{}) error {
+func (dr *ShortenerDatabase) copyURLsToDB(urlBatch [][]interface{}) error {
 	rowsCopied, err := dr.db.CopyFrom(
 		context.Background(),
 		pgx.Identifier{"shorteners"},
@@ -188,7 +220,7 @@ func (dr ShortenerDatabase) copyURLsToDB(urlBatch [][]interface{}) error {
 }
 
 // handleCopyError обрабатывает ошибки при копировании данных в базу данных.
-func (dr ShortenerDatabase) handleCopyError(err error, rowsCopied int64, expectedRows int) error {
+func (dr *ShortenerDatabase) handleCopyError(err error, rowsCopied int64, expectedRows int) error {
 	if pgErr := parsePGError(err); pgErr != nil {
 		return fmt.Errorf("%w for id: %v", ErrURLAlreadyExist, pgErr)
 	}
@@ -207,7 +239,7 @@ func parsePGError(err error) *pgconn.PgError {
 }
 
 // close закрывает соединение с базой данных.
-func (dr ShortenerDatabase) close(ctx context.Context) error {
+func (dr *ShortenerDatabase) close(ctx context.Context) error {
 	if err := dr.db.Close(ctx); err != nil {
 		slog.Error(ErrCloseDatabaseFailed.Error(), slog.String("error", err.Error()))
 		return err
@@ -217,7 +249,7 @@ func (dr ShortenerDatabase) close(ctx context.Context) error {
 }
 
 // Migrate выполняет миграцию базы данных.
-func (dr ShortenerDatabase) Migrate() error {
+func (dr *ShortenerDatabase) Migrate() error {
 	m, err := migrate.New("file://internal/migrations", dr.databaseDNS)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrOpenMigrateFailed, err)
@@ -231,7 +263,7 @@ func (dr ShortenerDatabase) Migrate() error {
 }
 
 // CheckHealth проверяет состояние соединения с базой данных.
-func (dr ShortenerDatabase) CheckHealth() error {
+func (dr *ShortenerDatabase) CheckHealth() error {
 	if err := dr.db.Ping(context.Background()); err != nil {
 		return fmt.Errorf("unable to ping database: %w", err)
 	}
