@@ -23,12 +23,12 @@ import (
 )
 
 // setupTestEnvironment инициализирует окружение для теста.
-func setupTestEnvironment(t *testing.T) (*mocks.MockShortenerRepository, *gomock.Controller, *shortener.Shortener) {
+func setupTestEnvironment(t *testing.T) (*mocks.MockRepository, *gomock.Controller, *shortener.Shortener) {
 
 	args := initArgs(t)
 
 	ctrl := gomock.NewController(t)
-	mockRepository := mocks.NewMockShortenerRepository(ctrl)
+	mockRepository := mocks.NewMockRepository(ctrl)
 
 	shortenerService := shortener.New(mockRepository, args.BaseURL)
 
@@ -116,6 +116,11 @@ func TestGetHandler(t *testing.T) {
 			id:             "nonexistent-id",
 			wantStatusCode: http.StatusNotFound,
 		},
+		{
+			name:           "id_deleted",
+			id:             "deleted-id",
+			wantStatusCode: http.StatusGone,
+		},
 	}
 
 	for _, tt := range tests {
@@ -123,7 +128,9 @@ func TestGetHandler(t *testing.T) {
 			mockRepository, ctrl, shortenerService := setupTestEnvironment(t)
 			defer ctrl.Finish()
 
-			if tt.wantStatusCode != http.StatusNotFound {
+			if tt.wantStatusCode == http.StatusGone {
+				mockRepository.EXPECT().Get(tt.id).Return(nil, storage.ErrURLDeleted)
+			} else if tt.wantStatusCode != http.StatusNotFound {
 				mockRepository.EXPECT().Get(tt.id).Return(&entity.URL{
 					ID:          "some-id",
 					ShortKey:    tt.id,
@@ -409,6 +416,69 @@ func TestGetAllHandler(t *testing.T) {
 				if len(urls) != len(tt.mockReturnValue) {
 					t.Errorf("expected number of URLs: got %v, want %v", len(urls), len(tt.mockReturnValue))
 				}
+			}
+		})
+	}
+}
+
+// TestDeleteHandler тестирует обработчик удаления короткого URL.
+func TestDeleteHandler(t *testing.T) {
+	tests := []struct {
+		name            string
+		id              string
+		contextUserID   string
+		mockReturnError error
+		wantStatusCode  int
+	}{
+		{
+			name:            "delete_existing_short_url",
+			id:              "some-short-url",
+			contextUserID:   "user123",
+			mockReturnError: nil,
+			wantStatusCode:  http.StatusAccepted,
+		},
+		{
+			name:            "delete_non_existent_short_url",
+			id:              "nonexistent-short-url",
+			contextUserID:   "user123",
+			mockReturnError: fmt.Errorf("not found"),
+			wantStatusCode:  http.StatusAccepted,
+		},
+		{
+			name:            "delete_without_user_id",
+			id:              "some-short-url",
+			contextUserID:   "",
+			mockReturnError: nil,
+			wantStatusCode:  http.StatusUnauthorized,
+		},
+		{
+			name:            "delete_with_service_error",
+			id:              "some-short-url",
+			contextUserID:   "user123",
+			mockReturnError: fmt.Errorf("service error"),
+			wantStatusCode:  http.StatusAccepted,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepository, ctrl, shortenerService := setupTestEnvironment(t)
+			defer ctrl.Finish()
+
+			if tt.contextUserID != "" {
+				mockRepository.EXPECT().MarkAsDeleted([]string{tt.id}, tt.contextUserID).Return(tt.mockReturnError)
+			}
+
+			body := strings.NewReader(fmt.Sprintf(`[ "%s" ]`, tt.id))
+			rw, req := sendRequest(http.MethodDelete, "/api/shorten", body)
+			req = req.WithContext(context.WithValue(req.Context(), middleware.UserIDContextKey, tt.contextUserID))
+			New(shortenerService).Delete(rw, req)
+
+			response := rw.Result()
+			defer responseClose(t, response)
+
+			if response.StatusCode != tt.wantStatusCode {
+				t.Errorf("expected status: got %v, want %v", response.StatusCode, tt.wantStatusCode)
 			}
 		})
 	}

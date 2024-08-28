@@ -24,10 +24,9 @@ func AuthMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			jwtSecret := viper.GetString("JWT_SECRET")
-
 			userID, err := validateAuthTokenFromRequest(r, jwtSecret)
+
 			if err != nil {
-				// Создаем новый токен
 				userID = uuid.New().String()
 				token, err := generateAuthToken(userID, jwtSecret)
 				if err != nil {
@@ -36,7 +35,6 @@ func AuthMiddleware() func(http.Handler) http.Handler {
 					return
 				}
 
-				// Устанавливаем куку с токеном
 				http.SetCookie(w, &http.Cookie{
 					Name:     "auth_token",
 					Value:    token,
@@ -46,14 +44,12 @@ func AuthMiddleware() func(http.Handler) http.Handler {
 					Secure:   false,
 				})
 
-				// Устанавливаем заголовок Authorization
 				w.Header().Set("Authorization", "Bearer "+token)
 				slog.Info("Generated new auth token for POST request", slog.String("userID", userID))
 			} else {
 				slog.Info("Valid token found", slog.String("userID", userID))
 			}
 
-			// Добавляем userID в контекст и продолжаем выполнение запроса
 			ctx := context.WithValue(r.Context(), UserIDContextKey, userID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -73,7 +69,6 @@ func AuthCheckMiddleware() func(http.Handler) http.Handler {
 				return
 			}
 
-			// Добавляем userID в контекст и продолжаем выполнение запроса
 			ctx := context.WithValue(r.Context(), UserIDContextKey, userID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -82,14 +77,12 @@ func AuthCheckMiddleware() func(http.Handler) http.Handler {
 
 // validateAuthTokenFromRequest извлекает и проверяет токен из заголовка Authorization или куки.
 func validateAuthTokenFromRequest(r *http.Request, secret string) (string, error) {
-	// Извлечение токена из заголовка Authorization
 	authHeader := r.Header.Get("Authorization")
 	var tokenStr string
 
 	if authHeader != "" {
 		tokenStr = strings.TrimPrefix(authHeader, "Bearer ")
 	} else {
-		// Пытаемся получить токен из куки, если заголовка нет
 		cookie, err := r.Cookie("auth_token")
 		if err == nil && cookie.Value != "" {
 			tokenStr = cookie.Value
@@ -129,7 +122,7 @@ func validateAuthToken(tokenStr, secret string) (string, error) {
 func generateAuthToken(userID, secret string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": userID,
-		"exp":     time.Now().Add(time.Hour * 24).Unix(), // Устанавливаем срок действия токена на 24 часа
+		"exp":     time.Now().Add(time.Hour * 24).Unix(),
 	})
 
 	signedToken, err := token.SignedString([]byte(secret))

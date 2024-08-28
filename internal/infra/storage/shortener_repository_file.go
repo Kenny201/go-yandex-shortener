@@ -187,7 +187,6 @@ func (fr *ShortenerFile) updateFile(userID string, shortKeys []string) error {
 	fr.mu.Lock()
 	defer fr.mu.Unlock()
 
-	// Создание временного файла
 	tmpFilePath := fr.filePath + ".tmp"
 	tmpFile, err := os.Create(tmpFilePath)
 	if err != nil {

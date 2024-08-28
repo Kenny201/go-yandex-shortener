@@ -11,31 +11,31 @@ import (
 	gomock "github.com/golang/mock/gomock"
 )
 
-// MockShortenerRepository is a mock of ShortenerRepository interface.
-type MockShortenerRepository struct {
+// MockRepository is a mock of Repository interface.
+type MockRepository struct {
 	ctrl     *gomock.Controller
-	recorder *MockShortenerRepositoryMockRecorder
+	recorder *MockRepositoryMockRecorder
 }
 
-// MockShortenerRepositoryMockRecorder is the mock recorder for MockShortenerRepository.
-type MockShortenerRepositoryMockRecorder struct {
-	mock *MockShortenerRepository
+// MockRepositoryMockRecorder is the mock recorder for MockRepository.
+type MockRepositoryMockRecorder struct {
+	mock *MockRepository
 }
 
-// NewMockShortenerRepository creates a new mock instance.
-func NewMockShortenerRepository(ctrl *gomock.Controller) *MockShortenerRepository {
-	mock := &MockShortenerRepository{ctrl: ctrl}
-	mock.recorder = &MockShortenerRepositoryMockRecorder{mock}
+// NewMockRepository creates a new mock instance.
+func NewMockRepository(ctrl *gomock.Controller) *MockRepository {
+	mock := &MockRepository{ctrl: ctrl}
+	mock.recorder = &MockRepositoryMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockShortenerRepository) EXPECT() *MockShortenerRepositoryMockRecorder {
+func (m *MockRepository) EXPECT() *MockRepositoryMockRecorder {
 	return m.recorder
 }
 
 // CheckHealth mocks base method.
-func (m *MockShortenerRepository) CheckHealth() error {
+func (m *MockRepository) CheckHealth() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CheckHealth")
 	ret0, _ := ret[0].(error)
@@ -43,13 +43,13 @@ func (m *MockShortenerRepository) CheckHealth() error {
 }
 
 // CheckHealth indicates an expected call of CheckHealth.
-func (mr *MockShortenerRepositoryMockRecorder) CheckHealth() *gomock.Call {
+func (mr *MockRepositoryMockRecorder) CheckHealth() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckHealth", reflect.TypeOf((*MockShortenerRepository)(nil).CheckHealth))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckHealth", reflect.TypeOf((*MockRepository)(nil).CheckHealth))
 }
 
 // Create mocks base method.
-func (m *MockShortenerRepository) Create(url *entity.URL) (*entity.URL, error) {
+func (m *MockRepository) Create(url *entity.URL) (*entity.URL, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Create", url)
 	ret0, _ := ret[0].(*entity.URL)
@@ -58,13 +58,13 @@ func (m *MockShortenerRepository) Create(url *entity.URL) (*entity.URL, error) {
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockShortenerRepositoryMockRecorder) Create(url interface{}) *gomock.Call {
+func (mr *MockRepositoryMockRecorder) Create(url interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockShortenerRepository)(nil).Create), url)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockRepository)(nil).Create), url)
 }
 
 // CreateList mocks base method.
-func (m *MockShortenerRepository) CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error) {
+func (m *MockRepository) CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateList", userID, urls)
 	ret0, _ := ret[0].([]*entity.URLItem)
@@ -73,13 +73,13 @@ func (m *MockShortenerRepository) CreateList(userID interface{}, urls []*entity.
 }
 
 // CreateList indicates an expected call of CreateList.
-func (mr *MockShortenerRepositoryMockRecorder) CreateList(userID, urls interface{}) *gomock.Call {
+func (mr *MockRepositoryMockRecorder) CreateList(userID, urls interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateList", reflect.TypeOf((*MockShortenerRepository)(nil).CreateList), userID, urls)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateList", reflect.TypeOf((*MockRepository)(nil).CreateList), userID, urls)
 }
 
 // Get mocks base method.
-func (m *MockShortenerRepository) Get(shortKey string) (*entity.URL, error) {
+func (m *MockRepository) Get(shortKey string) (*entity.URL, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", shortKey)
 	ret0, _ := ret[0].(*entity.URL)
@@ -88,13 +88,13 @@ func (m *MockShortenerRepository) Get(shortKey string) (*entity.URL, error) {
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockShortenerRepositoryMockRecorder) Get(shortKey interface{}) *gomock.Call {
+func (mr *MockRepositoryMockRecorder) Get(shortKey interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockShortenerRepository)(nil).Get), shortKey)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockRepository)(nil).Get), shortKey)
 }
 
 // GetAll mocks base method.
-func (m *MockShortenerRepository) GetAll(userID string) ([]*entity.URLItem, error) {
+func (m *MockRepository) GetAll(userID string) ([]*entity.URLItem, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetAll", userID)
 	ret0, _ := ret[0].([]*entity.URLItem)
@@ -103,13 +103,13 @@ func (m *MockShortenerRepository) GetAll(userID string) ([]*entity.URLItem, erro
 }
 
 // GetAll indicates an expected call of GetAll.
-func (mr *MockShortenerRepositoryMockRecorder) GetAll(userID interface{}) *gomock.Call {
+func (mr *MockRepositoryMockRecorder) GetAll(userID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAll", reflect.TypeOf((*MockShortenerRepository)(nil).GetAll), userID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAll", reflect.TypeOf((*MockRepository)(nil).GetAll), userID)
 }
 
 // MarkAsDeleted mocks base method.
-func (m *MockShortenerRepository) MarkAsDeleted(shortKeys []string, userID string) error {
+func (m *MockRepository) MarkAsDeleted(shortKeys []string, userID string) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "MarkAsDeleted", shortKeys, userID)
 	ret0, _ := ret[0].(error)
@@ -117,7 +117,7 @@ func (m *MockShortenerRepository) MarkAsDeleted(shortKeys []string, userID strin
 }
 
 // MarkAsDeleted indicates an expected call of MarkAsDeleted.
-func (mr *MockShortenerRepositoryMockRecorder) MarkAsDeleted(shortKeys, userID interface{}) *gomock.Call {
+func (mr *MockRepositoryMockRecorder) MarkAsDeleted(shortKeys, userID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkAsDeleted", reflect.TypeOf((*MockShortenerRepository)(nil).MarkAsDeleted), shortKeys, userID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkAsDeleted", reflect.TypeOf((*MockRepository)(nil).MarkAsDeleted), shortKeys, userID)
 }

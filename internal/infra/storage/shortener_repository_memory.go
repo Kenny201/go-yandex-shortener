@@ -107,15 +107,12 @@ func (mr *ShortenerMemory) MarkAsDeleted(shortKeys []string, userID string) erro
 	const batchSize = 10           // Размер батча для обновлений
 	numBatches := runtime.NumCPU() // Количество воркеров
 
-	// Создание группы ошибок и канала для передачи батчей URL
 	batchChan := make(chan []string, numBatches)
 
-	// Запуск воркеров с использованием errgroup
 	for i := 0; i < numBatches; i++ {
 		go mr.processBatchUpdates(userID, batchChan)
 	}
 
-	// Наполнение batchChan и закрытие канала
 	go func() {
 		for i := 0; i < len(shortKeys); i += batchSize {
 			end := i + batchSize

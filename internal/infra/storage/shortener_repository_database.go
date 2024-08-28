@@ -226,13 +226,11 @@ func (dr *ShortenerDatabase) MarkAsDeleted(shortKeys []string, userID string) er
 	const batchSize = 10           // Размер батча для обновлений
 	numBatches := runtime.NumCPU() // Количество воркеров
 
-	// Создание группы ошибок и каналов
 	eg := new(errgroup.Group)
 	batchChan := make(chan []string, numBatches)
 	doneChan := make(chan struct{})
 	defer close(doneChan)
 
-	// Запуск воркеров с использованием errgroup
 	for i := 0; i < numBatches; i++ {
 		workerID := i // Локальная переменная для избежания захвата
 		eg.Go(func() error {
@@ -256,15 +254,12 @@ func (dr *ShortenerDatabase) MarkAsDeleted(shortKeys []string, userID string) er
 			}
 			select {
 			case batchChan <- shortKeys[i:end]:
-				// Отправка батча
 			case <-doneChan:
-				// Завершение работы
 				return
 			}
 		}
 	}()
 
-	// Ожидание завершения всех воркеров и обработка ошибок
 	if err := eg.Wait(); err != nil {
 		slog.Error("Error occurred during batch processing", slog.String("error", err.Error()))
 		return fmt.Errorf("one or more errors occurred: %w", err)
@@ -281,7 +276,7 @@ func (dr *ShortenerDatabase) processBatchUpdates(userID string, batchChan <-chan
 		case batch, ok := <-batchChan:
 			if !ok {
 				slog.Info("Worker received all batches and exiting", slog.Int("workerID", workerID))
-				return nil // Канал закрыт, обработка завершена
+				return nil
 			}
 
 			slog.Info("Worker processing batch", slog.Int("workerID", workerID), slog.Int("batchSize", len(batch)))
