@@ -2,8 +2,8 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +17,7 @@ import (
 	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/mocks"
 )
@@ -316,6 +317,98 @@ func TestPostBatchHandler(t *testing.T) {
 
 			if contentType := response.Header.Get("Content-Type"); contentType != tt.wantResponseContentType {
 				t.Errorf("response content type header does not match: got %v, want %v", contentType, tt.wantResponseContentType)
+			}
+		})
+	}
+}
+
+// TestGetAllHandler тестирует обработчик получения всех сокращенных URL пользователя.
+func TestGetAllHandler(t *testing.T) {
+	tests := []struct {
+		name                    string
+		userID                  string
+		mockReturnValue         []*entity.URLItem
+		mockReturnError         error
+		wantStatusCode          int
+		wantResponseContentType string
+	}{
+		{
+			name:   "get_all_with_valid_userID",
+			userID: "user123",
+			mockReturnValue: []*entity.URLItem{
+				{ID: "1", ShortURL: "https://short.url/1", OriginalURL: "https://original.url/1"},
+				{ID: "2", ShortURL: "https://short.url/2", OriginalURL: "https://original.url/2"},
+			},
+			mockReturnError:         nil,
+			wantStatusCode:          http.StatusOK,
+			wantResponseContentType: "application/json",
+		},
+		{
+			name:                    "get_all_with_no_urls",
+			userID:                  "user123",
+			mockReturnValue:         []*entity.URLItem{},
+			mockReturnError:         nil,
+			wantStatusCode:          http.StatusNoContent,
+			wantResponseContentType: "application/json",
+		},
+		{
+			name:                    "get_all_with_no_userID",
+			userID:                  "",
+			mockReturnValue:         nil,
+			mockReturnError:         nil,
+			wantStatusCode:          http.StatusUnauthorized,
+			wantResponseContentType: "application/json",
+		},
+		{
+			name:                    "get_all_with_service_error",
+			userID:                  "user123",
+			mockReturnValue:         nil,
+			mockReturnError:         fmt.Errorf("service error"),
+			wantStatusCode:          http.StatusBadRequest,
+			wantResponseContentType: "application/json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepository, ctrl, shortenerService := setupTestEnvironment(t)
+			defer ctrl.Finish()
+
+			// Настройка ожидания вызова метода GetAllShortURL в зависимости от условий теста.
+			if tt.userID != "" {
+				mockRepository.EXPECT().GetAll(tt.userID).Return(tt.mockReturnValue, tt.mockReturnError)
+			}
+
+			rw, req := sendRequest(http.MethodGet, "/api/user/urls", nil)
+			req = req.WithContext(context.WithValue(req.Context(), middleware.UserIDContextKey, tt.userID))
+
+			New(shortenerService).GetAll(rw, req)
+
+			response := rw.Result()
+			defer responseClose(t, response)
+
+			if response.StatusCode != tt.wantStatusCode {
+				t.Errorf("expected status: got %v, want %v", response.StatusCode, tt.wantStatusCode)
+			}
+
+			if response.Header.Get("Content-Type") != tt.wantResponseContentType {
+				t.Errorf("response content type header does not match: got %v, want %v", response.Header.Get("Content-Type"), tt.wantResponseContentType)
+			}
+
+			if tt.wantStatusCode == http.StatusOK {
+				body, err := io.ReadAll(response.Body)
+				if err != nil {
+					t.Fatalf("failed to read response body: %v", err)
+				}
+
+				var urls []*entity.URLItem
+				if err := json.Unmarshal(body, &urls); err != nil {
+					t.Fatalf("failed to unmarshal response body: %v", err)
+				}
+
+				if len(urls) != len(tt.mockReturnValue) {
+					t.Errorf("expected number of URLs: got %v, want %v", len(urls), len(tt.mockReturnValue))
+				}
 			}
 		})
 	}
