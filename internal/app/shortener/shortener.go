@@ -125,8 +125,8 @@ func (s *Shortener) Delete(shortKeys []string, userID string) error {
 		return fmt.Errorf("empty URL list provided")
 	}
 
-	const batchSize = 10           // Размер батча для обновлений
-	numBatches := runtime.NumCPU() // Количество воркеров
+	const batchSize = 10                // Размер батча для обновлений
+	numBatches := runtime.GOMAXPROCS(0) // Количество воркеров
 
 	return s.repo.MarkAsDeleted(shortKeys, userID, batchSize, numBatches)
 }
