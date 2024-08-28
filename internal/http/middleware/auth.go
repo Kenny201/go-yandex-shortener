@@ -43,7 +43,7 @@ func AuthMiddleware() func(http.Handler) http.Handler {
 					Path:     "/",
 					HttpOnly: true,
 					SameSite: http.SameSiteStrictMode,
-					Secure:   true,
+					Secure:   false,
 				})
 
 				// Устанавливаем заголовок Authorization
