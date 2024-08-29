@@ -12,8 +12,6 @@ import (
 	"strings"
 	"sync"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
 )
@@ -132,45 +130,11 @@ func (fr *ShortenerFile) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // MarkAsDeleted обновляет поле IsDeleted в true для списка URL по коротким ключам.
-func (fr *ShortenerFile) MarkAsDeleted(shortKeys []string, userID string, batchSize int, numBatches int) error {
-	// Создание группы ошибок и канала для передачи батчей URL
-	eg := new(errgroup.Group)
-	batchChan := make(chan []string, numBatches)
-
-	// Запуск воркеров с использованием errgroup
-	for i := 0; i < numBatches; i++ {
-		eg.Go(func() error {
-			return fr.processBatchUpdates(userID, batchChan)
-		})
+func (fr *ShortenerFile) MarkAsDeleted(batch []string, userID string) error {
+	if err := fr.updateFile(userID, batch); err != nil {
+		return err // Возвращаем ошибку, чтобы она была обработана errgroup
 	}
 
-	// Наполнение batchChan и закрытие канала
-	go func() {
-		for i := 0; i < len(shortKeys); i += batchSize {
-			end := i + batchSize
-			if end > len(shortKeys) {
-				end = len(shortKeys)
-			}
-			batchChan <- shortKeys[i:end]
-		}
-		close(batchChan)
-	}()
-
-	// Ожидание завершения всех воркеров и обработки ошибок
-	if err := eg.Wait(); err != nil {
-		return fmt.Errorf("one or more errors occurred: %v", err)
-	}
-
-	return nil
-}
-
-// processBatchUpdates обрабатывает обновления URL в батчах.
-func (fr *ShortenerFile) processBatchUpdates(userID string, batchChan <-chan []string) error {
-	for batch := range batchChan {
-		if err := fr.updateFile(userID, batch); err != nil {
-			return err // Возвращаем ошибку, чтобы она была обработана errgroup
-		}
-	}
 	return nil
 }
 

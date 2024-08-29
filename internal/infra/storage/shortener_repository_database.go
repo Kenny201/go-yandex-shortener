@@ -13,7 +13,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"golang.org/x/sync/errgroup"
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -217,80 +216,15 @@ func (dr *ShortenerDatabase) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // MarkAsDeleted обновляет поле is_deleted на true для списка коротких URL.
-func (dr *ShortenerDatabase) MarkAsDeleted(shortKeys []string, userID string, batchSize int, numBatches int) error {
-	eg := new(errgroup.Group)
-	batchChan := make(chan []string, numBatches)
-	doneChan := make(chan struct{})
-	defer close(doneChan)
+func (dr *ShortenerDatabase) MarkAsDeleted(batch []string, userID string) error {
+	batchObj := &pgx.Batch{}
 
-	for i := 0; i < numBatches; i++ {
-		workerID := i // Локальная переменная для избежания захвата
-		eg.Go(func() error {
-			slog.Info("Worker started", slog.Int("workerID", workerID))
-			err := dr.processBatchUpdates(userID, batchChan, doneChan, workerID)
-			if err != nil {
-				slog.Error("Worker error", slog.Int("workerID", workerID), slog.String("error", err.Error()))
-			}
-			slog.Info("Worker finished", slog.Int("workerID", workerID))
-			return err
-		})
+	for _, key := range batch {
+		query := "UPDATE shorteners SET is_deleted = true WHERE short_key = $1 AND user_id = $2"
+		batchObj.Queue(query, key, userID)
 	}
 
-	// Запуск горутины для наполнения batchChan (Fan-Out)
-	go func() {
-		defer close(batchChan)
-		for i := 0; i < len(shortKeys); i += batchSize {
-			end := i + batchSize
-			if end > len(shortKeys) {
-				end = len(shortKeys)
-			}
-			select {
-			case batchChan <- shortKeys[i:end]:
-			case <-doneChan:
-				return
-			}
-		}
-	}()
-
-	if err := eg.Wait(); err != nil {
-		slog.Error("Error occurred during batch processing", slog.String("error", err.Error()))
-		return fmt.Errorf("one or more errors occurred: %w", err)
-	}
-
-	slog.Info("All batches processed successfully")
-	return nil
-}
-
-// processBatchUpdates обрабатывает обновления URL в батчах.
-func (dr *ShortenerDatabase) processBatchUpdates(userID string, batchChan <-chan []string, doneChan <-chan struct{}, workerID int) error {
-	for {
-		select {
-		case batch, ok := <-batchChan:
-			if !ok {
-				slog.Info("Worker received all batches and exiting", slog.Int("workerID", workerID))
-				return nil
-			}
-
-			slog.Info("Worker processing batch", slog.Int("workerID", workerID), slog.Int("batchSize", len(batch)))
-			batchObj := &pgx.Batch{}
-
-			for _, key := range batch {
-				slog.Debug("Worker queueing URL", slog.Int("workerID", workerID), slog.String("shortKey", key))
-				query := "UPDATE shorteners SET is_deleted = true WHERE short_key = $1 AND user_id = $2"
-				batchObj.Queue(query, key, userID)
-			}
-
-			if err := dr.executeBatch(batchObj); err != nil {
-				slog.Error("Failed to execute batch", slog.Int("workerID", workerID), slog.String("error", err.Error()))
-				return err // Возвращаем ошибку, чтобы она была обработана errgroup
-			}
-
-		case <-doneChan:
-			// Завершение работы, если doneChan закрыт
-			slog.Info("Worker received done signal", slog.Int("workerID", workerID))
-			return nil
-		}
-	}
+	return dr.executeBatch(batchObj)
 }
 
 // executeBatch выполняет пакетный запрос и передает ошибки в errorsChan.

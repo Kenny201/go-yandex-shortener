@@ -98,32 +98,9 @@ func (mr *ShortenerMemory) GetAll(userID string) ([]*entity.URLItem, error) {
 }
 
 // MarkAsDeleted устанавливает поле IsDeleted в true для списка URL по коротким ключам.
-func (mr *ShortenerMemory) MarkAsDeleted(shortKeys []string, userID string, batchSize int, numBatches int) error {
-	batchChan := make(chan []string, numBatches)
-
-	for i := 0; i < numBatches; i++ {
-		go mr.processBatchUpdates(userID, batchChan)
-	}
-
-	go func() {
-		for i := 0; i < len(shortKeys); i += batchSize {
-			end := i + batchSize
-			if end > len(shortKeys) {
-				end = len(shortKeys)
-			}
-			batchChan <- shortKeys[i:end]
-		}
-		close(batchChan)
-	}()
-
+func (mr *ShortenerMemory) MarkAsDeleted(batch []string, userID string) error {
+	mr.updateUrls(userID, batch)
 	return nil
-}
-
-// processBatchUpdates обрабатывает обновления URL в батчах.
-func (mr *ShortenerMemory) processBatchUpdates(userID string, batchChan <-chan []string) {
-	for batch := range batchChan {
-		mr.updateUrls(userID, batch)
-	}
 }
 
 // updateUrls обновление urls
