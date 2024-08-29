@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -33,7 +32,6 @@ var (
 	ErrUserListURL        = errors.New("no short URLs found for repository ID: %s")
 	ErrURLDeleted         = errors.New("URL is deleted")
 	ErrURLNotFound        = errors.New("URL not found")
-	mu                    sync.Mutex
 )
 
 type ShortenerDatabase struct {
@@ -44,10 +42,6 @@ type ShortenerDatabase struct {
 
 // NewShortenerDatabase создает новый экземпляр ShortenerDatabase и устанавливает подключение к базе данных.
 func NewShortenerDatabase(baseURL string, databaseDNS string) (*ShortenerDatabase, error) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	// Проверяем, существует ли уже подключение
 	config, err := pgxpool.ParseConfig(databaseDNS)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrParseConfigPGXPool, err)
