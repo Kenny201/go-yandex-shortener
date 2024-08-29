@@ -13,10 +13,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-type contextKey string
+type contextUserIDKey string
 
 const (
-	UserIDContextKey contextKey = "user_id"
+	UserIDContextKey contextUserIDKey = "user_id"
 )
 
 var (
