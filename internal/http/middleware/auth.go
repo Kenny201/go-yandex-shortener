@@ -19,6 +19,14 @@ const (
 	UserIDContextKey contextKey = "user_id"
 )
 
+var (
+	ErrMissingAuthToken     = errors.New("missing token in both Authorization header and auth_token cookie")
+	ErrUnexpectedSignMethod = errors.New("unexpected signing method")
+	ErrInvalidToken         = errors.New("invalid token")
+	ErrUserIDMissingInToken = errors.New("userID missing in token claims")
+	ErrInvalidTokenClaims   = errors.New("invalid token claims")
+)
+
 // AuthMiddleware создает новый токен и устанавливает его в заголовок Authorization и в куку, если токен отсутствует или недействителен.
 func AuthMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -87,7 +95,7 @@ func validateAuthTokenFromRequest(r *http.Request, secret string) (string, error
 		if err == nil && cookie.Value != "" {
 			tokenStr = cookie.Value
 		} else {
-			return "", errors.New("missing token in both Authorization header and auth_token cookie")
+			return "", ErrMissingAuthToken
 		}
 	}
 
@@ -98,24 +106,24 @@ func validateAuthTokenFromRequest(r *http.Request, secret string) (string, error
 func validateAuthToken(tokenStr, secret string) (string, error) {
 	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
+			return nil, ErrUnexpectedSignMethod
 		}
 		return []byte(secret), nil
 	})
 
 	if err != nil || !token.Valid {
-		return "", errors.New("invalid token")
+		return "", ErrInvalidToken
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		userID, ok := claims["user_id"].(string)
 		if !ok || userID == "" {
-			return "", errors.New("userID missing in token claims")
+			return "", ErrUserIDMissingInToken
 		}
 		return userID, nil
 	}
 
-	return "", errors.New("invalid token claims")
+	return "", ErrInvalidTokenClaims
 }
 
 // generateAuthToken создает новый токен с userID.
