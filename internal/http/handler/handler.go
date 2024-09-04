@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/dto"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
@@ -28,12 +29,14 @@ var (
 // Handler управляет HTTP-запросами, связанными с сокращением URL-адресов.
 type Handler struct {
 	shortenerService shortener.Shortener
+	deleteChannel    chan dto.DeleteTask
 }
 
 // New создает новый экземпляр Handler с заданным сервисом сокращения URL.
-func New(ss *shortener.Shortener) Handler {
+func New(ss *shortener.Shortener, deleteChannel chan dto.DeleteTask) Handler {
 	return Handler{
 		shortenerService: *ss,
+		deleteChannel:    deleteChannel,
 	}
 }
 

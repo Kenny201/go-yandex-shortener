@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/dto"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
@@ -73,7 +75,7 @@ func TestPostHandler(t *testing.T) {
 			}
 
 			rw, req := sendRequest(http.MethodPost, "/", strings.NewReader(tt.body))
-			New(shortenerService).Post(rw, req)
+			New(shortenerService, nil).Post(rw, req)
 
 			response := rw.Result()
 			defer responseClose(t, response)
@@ -143,7 +145,7 @@ func TestGetHandler(t *testing.T) {
 			// Полный URL с коротким ключом
 			rw, req := sendRequest(http.MethodGet, fmt.Sprintf("%s/%s", args.BaseURL, tt.id), nil)
 			req = withURLParam(req, "id", tt.id)
-			New(shortenerService).Get(rw, req)
+			New(shortenerService, nil).Get(rw, req)
 
 			response := rw.Result()
 			defer responseClose(t, response)
@@ -206,7 +208,7 @@ func TestPostAPIHandler(t *testing.T) {
 			}
 
 			rw, req := sendRequest(http.MethodPost, args.BaseURL, strings.NewReader(tt.body))
-			New(shortenerService).PostAPI(rw, req)
+			New(shortenerService, nil).PostAPI(rw, req)
 
 			response := rw.Result()
 			defer responseClose(t, response)
@@ -244,7 +246,7 @@ func TestPingHandler(t *testing.T) {
 			mockRepository.EXPECT().CheckHealth().Return(nil)
 
 			rw, req := sendRequest(http.MethodGet, args.BaseURL, nil)
-			New(shortenerService).Ping(rw, req)
+			New(shortenerService, nil).Ping(rw, req)
 
 			response := rw.Result()
 			defer responseClose(t, response)
@@ -313,7 +315,7 @@ func TestPostBatchHandler(t *testing.T) {
 			}
 
 			rw, req := sendRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(tt.body))
-			New(shortenerService).PostBatch(rw, req)
+			New(shortenerService, nil).PostBatch(rw, req)
 
 			response := rw.Result()
 			defer responseClose(t, response)
@@ -381,7 +383,7 @@ func TestGetAllHandler(t *testing.T) {
 			rw, req := sendRequest(http.MethodGet, "/api/user/urls", nil)
 			req = req.WithContext(context.WithValue(req.Context(), middleware.UserIDContextKey, tt.userID))
 
-			New(shortenerService).GetAll(rw, req)
+			New(shortenerService, nil).GetAll(rw, req)
 
 			response := rw.Result()
 			defer responseClose(t, response)
@@ -414,56 +416,73 @@ func TestGetAllHandler(t *testing.T) {
 }
 
 // TestDeleteHandler тестирует обработчик удаления короткого URL.
-func TestDeleteHandler(t *testing.T) {
+func TestHandler_Delete(t *testing.T) {
 	tests := []struct {
-		name            string
-		id              string
-		contextUserID   string
-		mockReturnError error
-		wantStatusCode  int
+		name           string
+		body           string
+		userID         string
+		expectedStatus int
+		expectTask     *dto.DeleteTask
+		expectError    bool
 	}{
 		{
-			name:            "delete_existing_short_url",
-			id:              "some-short-url",
-			contextUserID:   "user123",
-			mockReturnError: nil,
-			wantStatusCode:  http.StatusAccepted,
+			name:           "valid_request",
+			body:           `["short-key-1", "short-key-2"]`,
+			userID:         "user123",
+			expectedStatus: http.StatusAccepted,
+			expectTask: &dto.DeleteTask{
+				ShortKeys: []string{"short-key-1", "short-key-2"},
+				UserID:    "user123",
+			},
+			expectError: false,
 		},
 		{
-			name:            "delete_non_existent_short_url",
-			id:              "nonexistent-short-url",
-			contextUserID:   "user123",
-			mockReturnError: fmt.Errorf("not found"),
-			wantStatusCode:  http.StatusAccepted,
+			name:           "invalid_json",
+			body:           `invalid-json`,
+			userID:         "user123",
+			expectedStatus: http.StatusBadRequest,
+			expectTask:     nil,
+			expectError:    true,
 		},
 		{
-			name:            "delete_with_service_error",
-			id:              "some-short-url",
-			contextUserID:   "user123",
-			mockReturnError: fmt.Errorf("service error"),
-			wantStatusCode:  http.StatusAccepted,
+			name:           "empty_body",
+			body:           ``,
+			userID:         "user123",
+			expectedStatus: http.StatusBadRequest,
+			expectTask:     nil,
+			expectError:    true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockRepository, ctrl, shortenerService := setupTestEnvironment(t)
-			defer ctrl.Finish()
+			deleteChannel := make(chan dto.DeleteTask, 1)
 
-			if tt.contextUserID != "" {
-				mockRepository.EXPECT().MarkAsDeleted([]string{tt.id}, tt.contextUserID).Return(tt.mockReturnError)
-			}
+			h := Handler{deleteChannel: deleteChannel}
 
-			body := strings.NewReader(fmt.Sprintf(`[ "%s" ]`, tt.id))
+			body := strings.NewReader(tt.body)
+
 			rw, req := sendRequest(http.MethodDelete, "/api/shorten", body)
-			req = req.WithContext(context.WithValue(req.Context(), middleware.UserIDContextKey, tt.contextUserID))
-			New(shortenerService).Delete(rw, req)
+			req = req.WithContext(context.WithValue(req.Context(), middleware.UserIDContextKey, tt.userID))
+
+			h.Delete(rw, req)
 
 			response := rw.Result()
 			defer responseClose(t, response)
 
-			if response.StatusCode != tt.wantStatusCode {
-				t.Errorf("expected status: got %v, want %v", response.StatusCode, tt.wantStatusCode)
+			if response.StatusCode != tt.expectedStatus {
+				t.Errorf("expected status: got %v, want %v", response.StatusCode, tt.expectedStatus)
+			}
+
+			if !tt.expectError {
+				select {
+				case task := <-deleteChannel:
+					if !reflect.DeepEqual(task, *tt.expectTask) {
+						t.Errorf("expected task: got %v, want %v", task, *tt.expectTask)
+					}
+				default:
+					t.Errorf("expected task to be sent to channel, but it was not")
+				}
 			}
 		})
 	}

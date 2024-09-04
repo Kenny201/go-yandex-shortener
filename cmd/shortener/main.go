@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/Kenny201/go-yandex-shortener.git/cmd/shortener/config"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/dto"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http/handler"
@@ -37,11 +38,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	deleteChannel := make(chan dto.DeleteTask, 100)
+
 	shortenerService := shortener.New(repository, args.BaseURL)
 
-	urlHandler := handler.New(shortenerService)
+	go shortenerService.StartDeletionWorkers(deleteChannel, 5) // 5 воркеров
+
+	urlHandler := handler.New(shortenerService, deleteChannel)
 
 	http.NewServer(ctx, args.ServerAddress, urlHandler).Start()
+
+	close(deleteChannel)
 }
 
 func initializeRepository(args *config.Args) (shortener.Repository, error) {

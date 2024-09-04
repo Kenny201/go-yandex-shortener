@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/dto"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
@@ -134,11 +135,12 @@ func (h Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.shortenerService.Delete(shortKeys, userID)
-
-	if err != nil {
-		slog.Error("Failed to delete URLs", slog.String("userID", userID), slog.String("error", err.Error()))
+	task := dto.DeleteTask{
+		ShortKeys: shortKeys,
+		UserID:    userID,
 	}
+
+	h.deleteChannel <- task
 
 	slog.Info("Successfully deleted URLs for user", slog.String("userID", userID))
 	respondWithJSON(w, http.StatusAccepted, nil)
