@@ -354,16 +354,8 @@ func TestGetAllHandler(t *testing.T) {
 			name:                    "get_all_with_no_urls",
 			userID:                  "user123",
 			mockReturnValue:         []*entity.URLItem{},
-			mockReturnError:         nil,
+			mockReturnError:         storage.ErrUserListURL,
 			wantStatusCode:          http.StatusNoContent,
-			wantResponseContentType: "application/json",
-		},
-		{
-			name:                    "get_all_with_no_userID",
-			userID:                  "",
-			mockReturnValue:         nil,
-			mockReturnError:         nil,
-			wantStatusCode:          http.StatusUnauthorized,
 			wantResponseContentType: "application/json",
 		},
 		{
@@ -443,13 +435,6 @@ func TestDeleteHandler(t *testing.T) {
 			contextUserID:   "user123",
 			mockReturnError: fmt.Errorf("not found"),
 			wantStatusCode:  http.StatusAccepted,
-		},
-		{
-			name:            "delete_without_user_id",
-			id:              "some-short-url",
-			contextUserID:   "",
-			mockReturnError: nil,
-			wantStatusCode:  http.StatusUnauthorized,
 		},
 		{
 			name:            "delete_with_service_error",

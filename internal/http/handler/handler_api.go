@@ -97,12 +97,7 @@ func (h Handler) PostBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(middleware.UserIDContextKey).(string)
-	if !ok || userID == "" {
-		slog.Warn("Unauthorized access attempt: userID not found or empty")
-		respondWithError(w, http.StatusUnauthorized, "", "")
-		return
-	}
+	userID := r.Context().Value(middleware.UserIDContextKey).(string)
 
 	slog.Info("Fetching URLs for user", slog.String("userID", userID))
 
@@ -119,23 +114,12 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(urls) == 0 {
-		slog.Info("No URLs found for user", slog.String("userID", userID))
-		respondWithError(w, http.StatusNoContent, "", "")
-		return
-	}
-
 	slog.Info("Successfully fetched URLs for user", slog.String("userID", userID))
 	respondWithJSON(w, http.StatusOK, urls)
 }
 
 func (h Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(middleware.UserIDContextKey).(string)
-	if !ok || userID == "" {
-		slog.Warn("Unauthorized access attempt: userID not found or empty")
-		respondWithError(w, http.StatusUnauthorized, "", "")
-		return
-	}
+	userID := r.Context().Value(middleware.UserIDContextKey).(string)
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
