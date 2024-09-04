@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/dto"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
@@ -35,26 +36,22 @@ type Response struct {
 func (h Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 	var request Request
 
-	// Чтение тела запроса
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, FailedReadRequestBody, err.Error())
 		return
 	}
 
-	// Разбор тела запроса
 	if err := json.Unmarshal(body, &request); err != nil {
 		respondWithError(w, http.StatusBadRequest, FailedUnmarshall, err.Error())
 		return
 	}
 
-	// Проверка наличия URL
 	if request.URL == "" {
 		respondWithError(w, http.StatusBadRequest, BadRequest, ErrURLIsEmpty.Error())
 		return
 	}
 
-	// Создание короткого URL
 	shortURL, err := h.shortenerService.CreateShortURL(r.Context(), request.URL)
 
 	if err != nil {
@@ -74,7 +71,6 @@ func (h Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 func (h Handler) PostBatch(w http.ResponseWriter, r *http.Request) {
 	var requestBatch []*entity.URLItem
 
-	// Чтение тела запроса
 	body, err := io.ReadAll(r.Body)
 
 	if err != nil {
@@ -82,13 +78,11 @@ func (h Handler) PostBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Разбор тела запроса
 	if err := json.Unmarshal(body, &requestBatch); err != nil {
 		respondWithError(w, http.StatusBadRequest, FailedUnmarshall, err.Error())
 		return
 	}
 
-	// Создание списка коротких URL
 	urls, err := h.shortenerService.CreateListShortURL(r.Context(), requestBatch)
 
 	if err != nil {
@@ -104,18 +98,10 @@ func (h Handler) PostBatch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
-	// Получаем userID из контекста
-	userID, ok := r.Context().Value(middleware.UserIDContextKey).(string)
-	if !ok || userID == "" {
-		slog.Warn("Unauthorized access attempt: userID not found or empty")
-		respondWithError(w, http.StatusUnauthorized, "", "")
-		return
-	}
+	userID := r.Context().Value(middleware.UserIDContextKey).(string)
 
-	// Логируем userID для дальнейшего анализа
 	slog.Info("Fetching URLs for user", slog.String("userID", userID))
 
-	// Получаем список URL пользователя
 	urls, err := h.shortenerService.GetAllShortURL(userID)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserListURL) {
@@ -129,14 +115,35 @@ func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(urls) == 0 {
-		slog.Info("No URLs found for user", slog.String("userID", userID))
-		respondWithError(w, http.StatusNoContent, "", "")
+	slog.Info("Successfully fetched URLs for user", slog.String("userID", userID))
+	respondWithJSON(w, http.StatusOK, urls)
+}
+
+func (h Handler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middleware.UserIDContextKey).(string)
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+	var shortKeys []string
+
+	if err := json.Unmarshal(body, &shortKeys); err != nil {
+		http.Error(w, "Failed to parse JSON", http.StatusBadRequest)
 		return
 	}
 
-	slog.Info("Successfully fetched URLs for user", slog.String("userID", userID))
-	respondWithJSON(w, http.StatusOK, urls)
+	task := dto.DeleteTask{
+		ShortKeys: shortKeys,
+		UserID:    userID,
+	}
+
+	h.deleteChannel <- task
+
+	slog.Info("Successfully deleted URLs for user", slog.String("userID", userID))
+	respondWithJSON(w, http.StatusAccepted, nil)
 }
 
 // respondWithError отправляет ответ об ошибке в формате JSON.

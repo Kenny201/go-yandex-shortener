@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
@@ -11,20 +12,25 @@ import (
 type ShortenerMemory struct {
 	baseURL string
 	urls    map[string]entity.URL
+	mu      sync.Mutex
 }
 
 // NewShortenerMemory создает новый репозиторий сокращения ссылок в памяти.
-func NewShortenerMemory(baseURL string) ShortenerMemory {
-	return ShortenerMemory{
+func NewShortenerMemory(baseURL string) *ShortenerMemory {
+	return &ShortenerMemory{
 		baseURL: baseURL,
 		urls:    make(map[string]entity.URL),
 	}
 }
 
 // Get возвращает URL-адрес по короткому ключу, если он существует.
-func (mr ShortenerMemory) Get(shortKey string) (*entity.URL, error) {
+func (mr *ShortenerMemory) Get(shortKey string) (*entity.URL, error) {
 	for _, v := range mr.urls {
-		if v.ShortKey == shortKey {
+		if v.ShortKey == shortKey && v.DeletedFlag {
+			return nil, ErrURLDeleted // URL помечен как удаленный
+		}
+
+		if v.ShortKey == shortKey && !v.DeletedFlag {
 			slog.Info("URL retrieved successfully", slog.String("shortKey", shortKey))
 			return &v, nil
 		}
@@ -33,7 +39,7 @@ func (mr ShortenerMemory) Get(shortKey string) (*entity.URL, error) {
 }
 
 // Create добавляет новый URL в репозиторий, если его еще нет.
-func (mr ShortenerMemory) Create(url *entity.URL) (*entity.URL, error) {
+func (mr *ShortenerMemory) Create(url *entity.URL) (*entity.URL, error) {
 	if v, exists := mr.urls[url.OriginalURL]; exists {
 		return &v, ErrURLAlreadyExist
 	}
@@ -43,7 +49,7 @@ func (mr ShortenerMemory) Create(url *entity.URL) (*entity.URL, error) {
 }
 
 // CreateList добавляет список новых URL в репозиторий, возвращая их сокращенные версии.
-func (mr ShortenerMemory) CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error) {
+func (mr *ShortenerMemory) CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error) {
 	shortUrls := make([]*entity.URLItem, 0, len(urls))
 	baseURL, err := valueobject.NewBaseURL(mr.baseURL)
 
@@ -74,7 +80,7 @@ func (mr ShortenerMemory) CreateList(userID interface{}, urls []*entity.URLItem)
 }
 
 // GetAll получает все ссылки определённого пользователя
-func (mr ShortenerMemory) GetAll(userID string) ([]*entity.URLItem, error) {
+func (mr *ShortenerMemory) GetAll(userID string) ([]*entity.URLItem, error) {
 	shortUrls := make([]*entity.URLItem, 0, len(mr.urls))
 
 	for _, urlItem := range mr.urls {
@@ -91,8 +97,31 @@ func (mr ShortenerMemory) GetAll(userID string) ([]*entity.URLItem, error) {
 	return shortUrls, nil
 }
 
+// MarkAsDeleted устанавливает поле IsDeleted в true для списка URL по коротким ключам.
+func (mr *ShortenerMemory) MarkAsDeleted(batch []string, userID string) error {
+	mr.updateUrls(userID, batch)
+	return nil
+}
+
+// updateUrls обновление urls
+func (mr *ShortenerMemory) updateUrls(userID string, shortKeys []string) {
+	mr.mu.Lock()
+	defer mr.mu.Unlock()
+
+	// Обновление записей по ключам.
+	for _, shortKey := range shortKeys {
+		for originalURL, url := range mr.urls {
+			if url.ShortKey == shortKey && !url.DeletedFlag && url.UserID == userID {
+				url.DeletedFlag = true
+				mr.urls[originalURL] = url
+				break
+			}
+		}
+	}
+}
+
 // CheckHealth проверяет состояние репозитория, возвращая ошибку, если он не инициализирован.
-func (mr ShortenerMemory) CheckHealth() error {
+func (mr *ShortenerMemory) CheckHealth() error {
 	if mr.urls == nil {
 		return fmt.Errorf("memory URLs structure is not initialized")
 	}

@@ -5,12 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sync"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -21,41 +22,44 @@ import (
 )
 
 var (
-	ErrOpenDatabaseFailed  = errors.New("unable to connect to database")
-	ErrCloseDatabaseFailed = errors.New("unable to close database connection")
-	ErrOpenMigrateFailed   = errors.New("unable to open migrate files")
-	ErrCopyFrom            = errors.New("error during copy operation")
-	ErrCopyCount           = errors.New("discrepancy in copied data count")
-	ErrURLAlreadyExist     = errors.New("duplicate key found")
-	ErrEmptyURL            = errors.New("empty URL list provided")
-	ErrUserListURL         = errors.New("no short URLs found for repository ID: %s")
+	ErrParseConfigPGXPool = errors.New("error parse config for pgxpool")
+	ErrOpenDatabaseFailed = errors.New("unable to open database connection")
+	ErrOpenMigrateFailed  = errors.New("unable to open migrate files")
+	ErrCopyFrom           = errors.New("error during copy operation")
+	ErrCopyCount          = errors.New("discrepancy in copied data count")
+	ErrURLAlreadyExist    = errors.New("duplicate key found")
+	ErrEmptyURL           = errors.New("empty URL list provided")
+	ErrUserListURL        = errors.New("no short URLs found for user ID")
+	ErrURLDeleted         = errors.New("URL is deleted")
+	ErrURLNotFound        = errors.New("URL not found")
 )
 
-// Singleton для хранения единственного экземпляра подключения
-var (
-	mu sync.Mutex
-)
-
-// ShortenerDatabase предоставляет методы для работы с URL-ами в базе данных.
 type ShortenerDatabase struct {
-	db          *pgx.Conn
+	db          *pgxpool.Pool
 	databaseDNS string
 	baseURL     string
 }
 
 // NewShortenerDatabase создает новый экземпляр ShortenerDatabase и устанавливает подключение к базе данных.
 func NewShortenerDatabase(baseURL string, databaseDNS string) (*ShortenerDatabase, error) {
-	mu.Lock()
-	defer mu.Unlock()
+	config, err := pgxpool.ParseConfig(databaseDNS)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrParseConfigPGXPool, err)
+	}
 
-	// Проверяем, существует ли уже подключение
-	db, err := pgx.Connect(context.Background(), databaseDNS)
+	// Настройка параметров пула
+	config.MaxConns = 100                    // Максимальное количество соединений
+	config.MinConns = 10                     // Минимальное количество соединений
+	config.MaxConnIdleTime = 5 * time.Minute // Время ожидания неактивного соединения
+	config.MaxConnLifetime = 1 * time.Hour   // Время жизни соединения
+
+	dbPool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrOpenDatabaseFailed, err)
 	}
 
 	repo := &ShortenerDatabase{
-		db:          db,
+		db:          dbPool,
 		databaseDNS: databaseDNS,
 		baseURL:     baseURL,
 	}
@@ -66,14 +70,10 @@ func NewShortenerDatabase(baseURL string, databaseDNS string) (*ShortenerDatabas
 	return repo, nil
 }
 
-// Close Метод для закрытия соединения
+// Close закрывает соединение с базой данных.
 func (dr *ShortenerDatabase) Close(ctx context.Context) error {
-	if dr.db != nil {
-		if err := dr.db.Close(ctx); err != nil {
-			return fmt.Errorf("%w: %v", ErrCloseDatabaseFailed, err)
-		}
-		dr.db = nil
-	}
+	// Закрытие пула подключений, ошибки не возвращаются
+	dr.db.Close()
 	slog.Info("Database connection gracefully closed")
 	return nil
 }
@@ -81,13 +81,17 @@ func (dr *ShortenerDatabase) Close(ctx context.Context) error {
 // Get извлекает информацию о коротком URL из базы данных по короткому ключу.
 func (dr *ShortenerDatabase) Get(shortKey string) (*entity.URL, error) {
 	url := &entity.URL{}
-	query := "SELECT id, short_key, original_url FROM shorteners WHERE short_key = $1"
+	query := "SELECT id, short_key, original_url, is_deleted FROM shorteners WHERE short_key = $1"
 
-	if err := dr.db.QueryRow(context.Background(), query, shortKey).Scan(&url.ID, &url.ShortKey, &url.OriginalURL); err != nil {
+	if err := dr.db.QueryRow(context.Background(), query, shortKey).Scan(&url.ID, &url.ShortKey, &url.OriginalURL, &url.DeletedFlag); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("URL %v not found", shortKey)
+			return nil, ErrURLNotFound
 		}
 		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+
+	if url.DeletedFlag {
+		return nil, ErrURLDeleted // URL помечен как удаленный
 	}
 
 	slog.Info("URL retrieved", slog.String("shortKey", shortKey), slog.String("originalURL", url.OriginalURL))
@@ -199,10 +203,40 @@ func (dr *ShortenerDatabase) GetAll(userID string) ([]*entity.URLItem, error) {
 
 	// Если ссылки не найдены
 	if len(shortURLs) == 0 {
-		return nil, fmt.Errorf("%w:%s", ErrUserListURL, userID)
+		return nil, fmt.Errorf("%s:%s", ErrUserListURL, userID)
 	}
 
 	return shortURLs, nil
+}
+
+// MarkAsDeleted обновляет поле is_deleted на true для списка коротких URL.
+func (dr *ShortenerDatabase) MarkAsDeleted(batch []string, userID string) error {
+	batchObj := &pgx.Batch{}
+
+	for _, key := range batch {
+		query := "UPDATE shorteners SET is_deleted = true WHERE short_key = $1 AND user_id = $2"
+		batchObj.Queue(query, key, userID)
+	}
+
+	return dr.executeBatch(batchObj)
+}
+
+// executeBatch выполняет пакетный запрос и передает ошибки в errorsChan.
+func (dr *ShortenerDatabase) executeBatch(batch *pgx.Batch) error {
+	br := dr.db.SendBatch(context.Background(), batch)
+	defer br.Close()
+
+	for i := 0; i < batch.Len(); i++ {
+		tag, err := br.Exec()
+		if err != nil {
+			slog.Error("Failed to execute batch query", slog.String("error", err.Error()))
+			return fmt.Errorf("failed to update URL: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			slog.Warn("No rows affected for URL", slog.Int("batchIndex", i))
+		}
+	}
+	return nil
 }
 
 // copyURLsToDB копирует данные URL в базу данных с использованием CopyFrom.
@@ -235,16 +269,6 @@ func parsePGError(err error) *pgconn.PgError {
 	if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 		return pgErr
 	}
-	return nil
-}
-
-// close закрывает соединение с базой данных.
-func (dr *ShortenerDatabase) close(ctx context.Context) error {
-	if err := dr.db.Close(ctx); err != nil {
-		slog.Error(ErrCloseDatabaseFailed.Error(), slog.String("error", err.Error()))
-		return err
-	}
-	slog.Info("Database connection gracefully closed")
 	return nil
 }
 

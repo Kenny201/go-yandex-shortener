@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/Kenny201/go-yandex-shortener.git/internal/app/dto"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/valueobject"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
@@ -23,6 +24,8 @@ type Repository interface {
 	CreateList(userID interface{}, urls []*entity.URLItem) ([]*entity.URLItem, error)
 	// GetAll получает все сокращённые ссылки пользователя
 	GetAll(userID string) ([]*entity.URLItem, error)
+	// MarkAsDeleted помечает определённые ссылки как удалённые
+	MarkAsDeleted(batch []string, userID string) error
 	// CheckHealth проверяет состояние хранилища (доступность, целостность и т.д.).
 	CheckHealth() error
 }
@@ -115,6 +118,21 @@ func (s *Shortener) CreateListShortURL(ctx context.Context, urls []*entity.URLIt
 // В случае ошибки возвращает список частично созданных ссылок и ошибку.
 func (s *Shortener) GetAllShortURL(userID string) ([]*entity.URLItem, error) {
 	return s.repo.GetAll(userID)
+}
+
+func (s *Shortener) StartDeletionWorkers(deleteChannel chan dto.DeleteTask, numWorkers int) {
+	for i := 0; i < numWorkers; i++ {
+		go func(workerID int) {
+			slog.Info("Worker started", slog.Int("workerID", workerID))
+			for task := range deleteChannel {
+				slog.Info("Worker processing task", slog.Int("workerID", workerID), slog.Int("batchSize", len(task.ShortKeys)), slog.String("userID", task.UserID))
+				if err := s.repo.MarkAsDeleted(task.ShortKeys, task.UserID); err != nil {
+					slog.Error("Failed to mark batch as deleted", slog.Int("workerID", workerID), slog.String("error", err.Error()))
+				}
+			}
+			slog.Info("Worker finished", slog.Int("workerID", workerID))
+		}(i)
+	}
 }
 
 // CheckHealth проверяет состояние репозитория, с которым работает сервис.
