@@ -29,7 +29,7 @@ var (
 	ErrCopyCount          = errors.New("discrepancy in copied data count")
 	ErrURLAlreadyExist    = errors.New("duplicate key found")
 	ErrEmptyURL           = errors.New("empty URL list provided")
-	ErrUserListURL        = errors.New("no short URLs found for repository ID: %s")
+	ErrUserListURL        = errors.New("no short URLs found for user ID")
 	ErrURLDeleted         = errors.New("URL is deleted")
 	ErrURLNotFound        = errors.New("URL not found")
 )
@@ -203,7 +203,7 @@ func (dr *ShortenerDatabase) GetAll(userID string) ([]*entity.URLItem, error) {
 
 	// Если ссылки не найдены
 	if len(shortURLs) == 0 {
-		return nil, fmt.Errorf("%w:%s", ErrUserListURL, userID)
+		return nil, fmt.Errorf("%s:%s", ErrUserListURL, userID)
 	}
 
 	return shortURLs, nil
