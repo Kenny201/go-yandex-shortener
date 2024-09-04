@@ -5,15 +5,15 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/Kenny201/go-yandex-shortener.git/internal/app/shortener"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
-	"github.com/go-chi/chi/v5"
 )
 
 const (
 	FailedReadRequestBody = "failed reading request body"
 	FailedUnmarshall      = "failed to unmarshal request body"
-	FailedMarshall        = "failed to marshal response"
 	RequestBodyIsEmpty    = "request body is empty"
 	BadRequest            = "bad request"
 	URLFieldIsEmpty       = "the url field cannot be empty"
@@ -68,7 +68,7 @@ func (h Handler) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortURL, err := h.shortenerService.CreateShortURL(string(body))
+	shortURL, err := h.shortenerService.CreateShortURL(r.Context(), string(body))
 
 	if err != nil {
 		if errors.Is(err, storage.ErrURLAlreadyExist) {

@@ -3,10 +3,13 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/Kenny201/go-yandex-shortener.git/internal/domain/shortener/entity"
+	"github.com/Kenny201/go-yandex-shortener.git/internal/http/middleware"
 	"github.com/Kenny201/go-yandex-shortener.git/internal/infra/storage"
 )
 
@@ -52,7 +55,7 @@ func (h Handler) PostAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Создание короткого URL
-	shortURL, err := h.shortenerService.CreateShortURL(request.URL)
+	shortURL, err := h.shortenerService.CreateShortURL(r.Context(), request.URL)
 
 	if err != nil {
 		if errors.Is(err, storage.ErrURLAlreadyExist) {
@@ -86,7 +89,7 @@ func (h Handler) PostBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Создание списка коротких URL
-	urls, err := h.shortenerService.CreateListShortURL(requestBatch)
+	urls, err := h.shortenerService.CreateListShortURL(r.Context(), requestBatch)
 
 	if err != nil {
 		if errors.Is(err, storage.ErrURLAlreadyExist) {
@@ -98,6 +101,42 @@ func (h Handler) PostBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, http.StatusCreated, urls)
+}
+
+func (h Handler) GetAll(w http.ResponseWriter, r *http.Request) {
+	// Получаем userID из контекста
+	userID, ok := r.Context().Value(middleware.UserIDContextKey).(string)
+	if !ok || userID == "" {
+		slog.Warn("Unauthorized access attempt: userID not found or empty")
+		respondWithError(w, http.StatusUnauthorized, "", "")
+		return
+	}
+
+	// Логируем userID для дальнейшего анализа
+	slog.Info("Fetching URLs for user", slog.String("userID", userID))
+
+	// Получаем список URL пользователя
+	urls, err := h.shortenerService.GetAllShortURL(userID)
+	if err != nil {
+		if errors.Is(err, storage.ErrUserListURL) {
+			slog.Info("No URLs found for user", slog.String("userID", userID))
+			respondWithError(w, http.StatusNoContent, "", "")
+			return
+		}
+
+		slog.Error("Error fetching URLs for user", slog.String("userID", userID), slog.String("error", err.Error()))
+		respondWithError(w, http.StatusBadRequest, "", err.Error())
+		return
+	}
+
+	if len(urls) == 0 {
+		slog.Info("No URLs found for user", slog.String("userID", userID))
+		respondWithError(w, http.StatusNoContent, "", "")
+		return
+	}
+
+	slog.Info("Successfully fetched URLs for user", slog.String("userID", userID))
+	respondWithJSON(w, http.StatusOK, urls)
 }
 
 // respondWithError отправляет ответ об ошибке в формате JSON.
@@ -115,6 +154,7 @@ func respondWithJSON(w http.ResponseWriter, statusCode int, payload interface{})
 	}
 
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		respondWithError(w, http.StatusInternalServerError, FailedMarshall, err.Error())
+		// Здесь не нужно вызывать respondWithError снова, так как это приведет к повторному вызову WriteHeader.
+		http.Error(w, fmt.Sprintf(`{"error": "failed to marshal response", "details": "%s"}`, err.Error()), http.StatusInternalServerError)
 	}
 }

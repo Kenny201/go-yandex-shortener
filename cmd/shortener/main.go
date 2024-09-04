@@ -31,12 +31,14 @@ func main() {
 	defer stop()
 
 	repository, err := initializeRepository(args)
+
 	if err != nil {
 		slog.Error("failed to initialize repository", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
 
 	shortenerService := shortener.New(repository, args.BaseURL)
+
 	urlHandler := handler.New(shortenerService)
 
 	http.NewServer(ctx, args.ServerAddress, urlHandler).Start()
@@ -45,7 +47,7 @@ func main() {
 func initializeRepository(args *config.Args) (shortener.Repository, error) {
 	switch {
 	case args.DatabaseDNS != "":
-		repo, err := storage.NewDatabaseShortenerRepository(args.BaseURL, args.DatabaseDNS)
+		repo, err := storage.NewShortenerDatabase(args.BaseURL, args.DatabaseDNS)
 		if err != nil {
 			return nil, err
 		}
@@ -55,9 +57,9 @@ func initializeRepository(args *config.Args) (shortener.Repository, error) {
 		return repo, nil
 
 	case args.FileStoragePath != "":
-		return storage.NewFileShortenerRepository(args.BaseURL, args.FileStoragePath)
+		return storage.NewShortenerFile(args.BaseURL, args.FileStoragePath)
 
 	default:
-		return storage.NewMemoryShortenerRepository(args.BaseURL), nil
+		return storage.NewShortenerMemory(args.BaseURL), nil
 	}
 }
