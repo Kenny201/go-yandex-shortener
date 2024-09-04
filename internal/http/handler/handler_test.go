@@ -33,7 +33,6 @@ func setupTestEnvironment(t *testing.T) (*mocks.MockRepository, *gomock.Controll
 	mockRepository := mocks.NewMockRepository(ctrl)
 
 	shortenerService := shortener.New(mockRepository, args.BaseURL)
-
 	return mockRepository, ctrl, shortenerService
 }
 
